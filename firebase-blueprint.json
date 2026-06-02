@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "codeRequest": {
+      "title": "Code Request",
+      "description": "Unique access codes and requests for activation of Pelita Soal.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Document ID"
+        },
+        "schoolName": {
+          "type": "string",
+          "description": "Name of school requesting code"
+        },
+        "teacherName": {
+          "type": "string",
+          "description": "Name of teacher"
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of teacher (e.g. Guru Kelas)"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Selected test subject"
+        },
+        "whatsappNumber": {
+          "type": "string",
+          "description": "Teacher's WhatsApp contact number"
+        },
+        "uniqueCode": {
+          "type": "string",
+          "description": "The unique code issued (e.g., GP-PS012R)"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the code is activated or still pending transfer verification"
+        },
+        "buktiTransfer": {
+          "type": "string",
+          "description": "Base64 string representing uploaded transfer proof image, or empty"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Date and time representation of registration"
+        }
+      },
+      "required": ["id", "schoolName", "teacherName", "uniqueCode", "isActive"]
+    }
+  },
+  "firestore": {
+    "codeRequests/{requestId}": {
+      "schema": "codeRequest",
+      "description": "List of active and requested licensing codes."
+    }
+  }
+}
