@@ -900,7 +900,7 @@ export async function apiGenerateSoal(
           type: "OBJECT",
           properties: {
             number: { type: "INTEGER", description: "Nomor soal." },
-            questionType: { type: "STRING", description: "Bentuk Soal ('Pilihan Ganda', 'Isian Singkat', atau 'Uraian')." },
+            questionType: { type: "STRING", description: "Bentuk Soal ('Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Menjodohkan', 'Isian Singkat', atau 'Uraian'). HARUS SAMA PERSIS dengan apa yang diminta di Kisi-Kisi." },
             cognitiveLevel: { type: "STRING", description: "Level kognitif soal." },
             materi: { type: "STRING", description: "Materi pokok." },
             stimulusText: { type: "STRING", description: "Teks stimulus pendukung." },

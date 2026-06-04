@@ -1977,7 +1977,7 @@ app.post("/api/generate-soal", async (req, res) => {
               },
               questionType: {
                 type: Type.STRING,
-                description: "Bentuk Soal ('Pilihan Ganda', 'Isian Singkat', atau 'Uraian').",
+                description: "Bentuk Soal ('Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Menjodohkan', 'Isian Singkat', atau 'Uraian'). HARUS SAMA PERSIS dengan apa yang diminta di Kisi-Kisi.",
               },
               cognitiveLevel: {
                 type: Type.STRING,
