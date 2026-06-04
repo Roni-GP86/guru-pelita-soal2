@@ -1343,6 +1343,9 @@ async function adjustAndNormalizeIllustratedQuestions(questions: any[], targetCo
 
     processedQuestions.push(cpQ);
   }
+
+  return processedQuestions;
+}
 // 1. API: Generate Topics & Capaian Pembelajaran based on Class and Subject
 app.post("/api/generate-topics", async (req, res) => {
   const { subject, gradeClass, userApiKey, customKeys } = req.body;
@@ -1897,6 +1900,8 @@ app.post("/api/generate-soal", async (req, res) => {
       - Anda SANGAT DILARANG menyertakan gambar, ilustrasi, lukisan, foto, sketsa, diagram gambar, atau visual apa pun di seluruh naskah soal.
       - SANGAT DILARANG menggunakan awalan "Perhatikan gambar berikut!" atau sejenisnya pada seluruh teks pertanyaan atau stimulus. No image/visual stimulus is allowed!
       - Kosongkan properti 'visualAnalysis' (isi dengan null/kosong).
+      - JIKA TIPE "Pilihan Ganda Kompleks": Sediakan 4 "options" berupa pernyataan-pernyataan. Kunci jawaban "answerKey" berisi huruf jawaban benar yang dipisah koma (misal: "A, C").
+      - JIKA TIPE "Menjodohkan": Anda WAJIB mengisi properti "pairs" dengan 3-4 pasang { question: "...", answer: "..." }. "questionText" bisa diisi instruksi seperti "Jodohkanlah pernyataan di kolom kiri dengan jawaban yang tepat di kolom kanan!". "options" dikosongkan.
       - Kosongkan properti 'imagePrompt', 'imagenPrompt', 'imageUrl', dan 'svgContent' (isi dengan murni string kosong "").
 
       ==================================================================
@@ -1933,13 +1938,23 @@ app.post("/api/generate-soal", async (req, res) => {
          Dayu: "Apakah kelerengku ada di dalam laci, Edi?"
          Edi: "Iya, ada tepat di sudut kanan bawah laci meja."
       5. Urutan Langkah / Prosedur: Tuliskan bertingkat memakai nomor urutan (1, 2, 3...) yang teratur dan bersih.
-      6. Skenario / Kasus: Rangkai sebuah narasi inspirasi kontekstual kehidupan sekolah dasar di Indonesia dengan nama-nama tokoh (Andi, Budi, Dayu, Lani, Siti, Edo, Beni, Made, Udin, dsb), nama lokasi desa, dan objek nyata (buku, kantin, koperasi, kolam ikan, botol air, pensil, dsb) secara dinamis, berbeda-beda, dan tidak berulang antar nomor soal.
+      6. Skenario / Kasus: WAJIB SANGAT BERVARIASI! Jangan terus-menerus menggunakan subjek/objek yang sama. 
+         * NAMA TOKOH: Acak nama dari berbagai latar belakang budaya/agama (misal: Islami seperti Ali, Fatimah, Yusuf; Kristen seperti Yohanes, Maria, Stefanus; Bali seperti Wayan, Made; Nasional seperti Budi, Siti). JANGAN menggunakan nama yang sama di soal berurutan!
+         * LATAR TEMPAT: Jangan hanya di sekolah. Sesuaikan dengan materi! Gunakan lokasi seperti: pasar tradisional, terminal bus, sawah, pegunungan, bukit, laut, sungai, perpustakaan, rumah sakit, puskesmas, lapangan olahraga, museum, dsb.
+         * PERAN/PROFESI: Gunakan variasi profesi dan hubungan keluarga: paman, bibi, kakek, nenek, dokter, bidan, petani, nelayan, polisi, pedagang, masinis, dsb.
+         * ACAK JAWABAN: Pastikan pola kunci jawaban benar ACAK (A, B, C, D) di setiap nomor. Jangan jadikan A terus-menerus sebagai jawaban benar!
+         * SETIAP NOMOR WAJIB BERBEDA: Soal dan stimulus harus benar-benar berbeda dari nomor sebelumnya. JANGAN mengulang jalan cerita atau pola kalimat!
 
       ==================================================================
-      ATURAN DETIL KELAS & KOGNITIF:
+      ATURAN DETIL KELAS & KOGNITIF (SANGAT PENTING):
       ==================================================================
-      - Gunakan bahasa murni yang sangat pendek, lugas, bersahabat, ramah anak, dan bebas dari istilah asing rumit.
-      - Jangan ulangi nama-nama tokoh berturut-turut pada nomor yang bersebelahan. Gunakan variasi nama Indonesia: Andi, Budi, Cici, Dedi, Evi, Fandi, Gita, Hari, Iwan, Julia, Rian, Sari, Dian, Tono, Wati.
+      - TINGKAT KESULITAN & BAHASA: WAJIB DAN HARUS memperhitungkan dengan sangat teliti kemampuan murid berdasarkan tingkatan KELAS yang diminta! Gunakan bahasa, panjang kalimat, dan logika penalaran yang 100% cocok dengan tingkat kognitif dan umur siswa di kelas tersebut.
+      - CAPAIAN PEMBELAJARAN (CP): Semua soal wajib merujuk secara akurat pada materi dan Capaian Pembelajaran dari Elemen yang ada. Jangan menyimpang dari topik!
+      - SOAL ISIAN SINGKAT & URAIAN: 
+        * Jangan hanya memberikan kalimat pertanyaan kering yang membosankan! 
+        * WAJIB membuat STIMULUS YANG SANGAT MENARIK sebagai pengantar soal Isian Singkat dan Uraian. Gunakan pengantar seperti: percakapan pendek yang seru, kutipan dongeng/cerita fabel, puisi anak, cerita pengalaman sehari-hari, teka-teki, atau pantun.
+        * Pertanyaan yang muncul di bagian "questionText" hanya langsung menanyakan inti permasalahan, TANPA titik-titik (.....) karena guru akan menyediakan kertas lembar jawaban terpisah secara manual.
+      - PASTIKAN SANGAT BERVARIASI (ENTROPI TINGGI) untuk setiap hasil generate. Jauhi template monoton!
       
       Hasilkan keluaran JSON murni terstruktur.
     `;
@@ -1983,11 +1998,23 @@ app.post("/api/generate-soal", async (req, res) => {
               options: {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
-                description: "Untuk Pilihan Ganda, berikan 4 pilihan lengkap (contoh: ['A. Pilihan satu', 'B. Pilihan dua', ...]). Kembalikan array kosong jika isian/uraian.",
+                description: "Pilihan jawaban atau pernyataan. Wajib diisi (A, B, C, D) jika PG. Wajib diisi 4 pernyataan jika tipe Pilihan Ganda Kompleks (PGK). Kembalikan array kosong jika isian/uraian.",
               },
               answerKey: {
                 type: Type.STRING,
-                description: "Kunci jawaban definitif. Khusus untuk bentuk 'Pilihan Ganda', wajib berupa satu huruf kecil antara 'a', 'b', 'c', atau 'd'.",
+                description: "Kunci jawaban definitif. Khusus untuk bentuk 'Pilihan Ganda', wajib berupa satu huruf kecil antara 'a', 'b', 'c', atau 'd'. Untuk PGK, isi dengan huruf jawaban benar dipisah koma (misal: 'A, C'). Untuk Menjodohkan tulis kuncinya/kosongkan.",
+              },
+              pairs: {
+                type: Type.ARRAY,
+                items: { 
+                  type: Type.OBJECT,
+                  properties: {
+                    question: { type: Type.STRING },
+                    answer: { type: Type.STRING }
+                  },
+                  required: ["question", "answer"]
+                },
+                description: "WAJIB DIISI HANYA UNTUK SOAL MENJODOHKAN. Berisi pasangan pertanyaan/pernyataan dan jawaban/pasangannya."
               },
               alternativeAnswers: {
                 type: Type.ARRAY,
@@ -2039,12 +2066,31 @@ app.post("/api/generate-soal", async (req, res) => {
     // Intelligent normalization pipeline for high-accuracy educational outputs
     const normalizedData = data.map((q: any) => {
       const promptStr = q.imagePrompt || q.imagenPrompt || "";
-      if (q.questionType !== "Pilihan Ganda" || !q.options || q.options.length === 0) {
-        return {
-          ...q,
-          imagePrompt: promptStr,
-          imagenPrompt: promptStr
-        };
+      if (q.questionType === "Pilihan Ganda Kompleks") {
+        if (!q.options || q.options.length < 4) {
+          q.options = [
+            `Pernyataan 1 tentang ${q.materi || 'materi ini'}`,
+            `Pernyataan 2 tentang ${q.materi || 'materi ini'}`,
+            `Pernyataan 3 tentang ${q.materi || 'materi ini'}`,
+            `Pernyataan 4 tentang ${q.materi || 'materi ini'}`
+          ];
+        }
+        return { ...q, imagePrompt: promptStr, imagenPrompt: promptStr };
+      }
+
+      if (q.questionType === "Menjodohkan") {
+        if (!q.pairs || q.pairs.length < 3) {
+          q.pairs = [
+            { question: `Konsep A (${q.materi || 'Materi'})`, answer: "Pasangan A" },
+            { question: `Konsep B (${q.materi || 'Materi'})`, answer: "Pasangan B" },
+            { question: `Konsep C (${q.materi || 'Materi'})`, answer: "Pasangan C" }
+          ];
+        }
+        return { ...q, imagePrompt: promptStr, imagenPrompt: promptStr };
+      }
+
+      if (q.questionType !== "Pilihan Ganda") {
+        return { ...q, imagePrompt: promptStr, imagenPrompt: promptStr };
       }
       
       let opts = [...q.options].slice(0, 4);
@@ -2089,11 +2135,29 @@ app.post("/api/generate-soal", async (req, res) => {
         correctIdx = 0;
       }
 
+      // Force shuffle options right after generation to destroy any LLM sequential pattern
+      const originalCorrectOpt = opts[correctIdx];
+      const rawOpts = opts.map(opt => opt.replace(/^[A-D][.\s)]+/, "").trim());
+      const rawCorrectText = originalCorrectOpt.replace(/^[A-D][.\s)]+/, "").trim();
+      
+      for (let i = rawOpts.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rawOpts[i], rawOpts[j]] = [rawOpts[j], rawOpts[i]];
+      }
+      
+      let newCorrectIdx = 0;
+      const shuffledOpts = rawOpts.map((opt, idx) => {
+        if (opt === rawCorrectText) {
+          newCorrectIdx = idx;
+        }
+        return `${String.fromCharCode(65 + idx)}. ${opt}`;
+      });
+
       return {
         ...q,
         materi: cleanMateriInServer(q.materi || ""),
-        options: opts,
-        answerKey: String.fromCharCode(97 + correctIdx),
+        options: shuffledOpts,
+        answerKey: String.fromCharCode(97 + newCorrectIdx),
         imagePrompt: promptStr,
         imagenPrompt: promptStr
       };

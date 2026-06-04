@@ -1254,15 +1254,38 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
       expl = template.expl;
     }
 
+    let finalOptions: string[] = [];
+    let finalPairs: any[] = [];
+    
+    if (type === "Pilihan Ganda") {
+      finalOptions = opts;
+    } else if (type === "Pilihan Ganda Kompleks") {
+      finalOptions = [
+        `Konsep A mengenai ${topic} yang dipelajari`,
+        `Kondisi B mengenai penerapan ${topic}`,
+        `Analisis C terkait pemahaman ${topic}`,
+        `Kesimpulan D mengenai materi ${topic}`
+      ];
+      key = "A, C";
+    } else if (type === "Menjodohkan") {
+      finalPairs = [
+        { question: `Konsep A dari ${topic}`, answer: "Jawaban A" },
+        { question: `Konsep B dari ${topic}`, answer: "Jawaban B" },
+        { question: `Konsep C dari ${topic}`, answer: "Jawaban C" },
+        { question: `Konsep D dari ${topic}`, answer: "Jawaban D" }
+      ];
+    }
+
     questions.push({
       number: num,
       questionType: type,
       cognitiveLevel: level,
       materi: topic,
       stimulusText: stim,
-      questionText: qtext,
-      options: type === "Pilihan Ganda" ? opts : [],
-      answerKey: type === "Pilihan Ganda" ? key : "Jawaban logis terverifikasi guru",
+      questionText: type === "Menjodohkan" && !qtext.includes("Jodohkan") ? "Jodohkanlah pernyataan di kolom kiri dengan jawaban di kolom kanan!" : qtext,
+      options: finalOptions,
+      pairs: finalPairs,
+      answerKey: type === "Pilihan Ganda" ? key : (type === "Pilihan Ganda Kompleks" ? "A, C" : "Sesuai pasangan yang benar"),
       alternativeAnswers: type === "Pilihan Ganda" ? [] : ["Alternatif jawaban logis sesuai kurikulum"],
       explanation: expl,
       svgContent: "",

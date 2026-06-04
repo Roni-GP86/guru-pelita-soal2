@@ -5,9 +5,10 @@ import { ListFilter, Plus, Trash2, HelpCircle } from "lucide-react";
 interface QuestionConfigFormProps {
   configs: QuestionConfig[];
   onChange: (configs: QuestionConfig[]) => void;
+  gradeClass: string;
 }
 
-export default function QuestionConfigForm({ configs, onChange }: QuestionConfigFormProps) {
+export default function QuestionConfigForm({ configs, onChange, gradeClass }: QuestionConfigFormProps) {
   
   const handleAddRow = () => {
     const defaultNewRow: QuestionConfig = {
@@ -100,6 +101,12 @@ export default function QuestionConfigForm({ configs, onChange }: QuestionConfig
                     className="w-full pl-9 pr-3 py-3.5 bg-slate-950/85 border border-slate-800/90 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/15 focus:border-amber-500 transition-all cursor-pointer text-slate-200"
                   >
                     <option value="Pilihan Ganda">Pilihan Ganda (PG)</option>
+                    {(["Kelas 4", "Kelas 5", "Kelas 6"].includes(gradeClass)) && (
+                      <>
+                        <option value="Pilihan Ganda Kompleks">Pilihan Ganda Kompleks (PGK)</option>
+                        <option value="Menjodohkan">Menjodohkan</option>
+                      </>
+                    )}
                     <option value="Isian Singkat">Isian Singkat</option>
                     <option value="Uraian">Uraian / Essay</option>
                   </select>

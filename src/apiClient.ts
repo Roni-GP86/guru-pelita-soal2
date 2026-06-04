@@ -82,10 +82,6 @@ export function cleanKisiKisiAnswerKey(answerKey: string, questionType: string, 
   let key = (answerKey || "").trim();
   
   if (cleanType === "pilihan ganda") {
-    if (key.toLowerCase().includes("atau") || key.toLowerCase().includes("/") || key.toLowerCase().includes(",")) {
-      const letters = ["A", "B", "C", "D"];
-      return letters[index % 4];
-    }
     const match = key.match(/^[a-dA-D](?:\b|[.\s\)]|$)/);
     if (match) {
       return match[0].charAt(0).toUpperCase();
@@ -94,8 +90,12 @@ export function cleanKisiKisiAnswerKey(answerKey: string, questionType: string, 
     if (generalMatch) {
       return generalMatch[1].toUpperCase();
     }
+    
+    // Fallback: Randomize completely instead of sequential pattern
     const letters = ["A", "B", "C", "D"];
-    return letters[index % 4];
+    // using index as a salt but shuffling it up nicely, or just random
+    // since this is a fallback, random is fine
+    return letters[Math.floor(Math.random() * 4)];
   }
   
   return key;
@@ -782,8 +782,8 @@ export async function apiGenerateKisiKisi(
             materi: { type: "STRING", description: "NAMA MATERI UTAMA SAJA (2-4 kata)." },
             indicator: { type: "STRING", description: "Indikator soal lengkap." },
             cognitiveLevel: { type: "STRING", description: "Tingkat kognitif (Level 1, Level 2, atau Level 3)." },
-            questionType: { type: "STRING", description: "Bentuk Soal: 'Pilihan Ganda', 'Isian Singkat', atau 'Uraian'." },
-            answerKey: { type: "STRING", description: "Kunci jawaban tunggal." }
+            questionType: { type: "STRING", description: "Bentuk Soal: 'Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Menjodohkan', 'Isian Singkat', atau 'Uraian'." },
+            answerKey: { type: "STRING", description: "Kunci jawaban tunggal atau jika PGK/Menjodohkan bisa koma separated." }
           },
           required: ["number", "cp", "element", "materi", "indicator", "cognitiveLevel", "questionType", "answerKey"]
         }
@@ -908,13 +908,25 @@ export async function apiGenerateSoal(
             options: {
               type: "ARRAY",
               items: { type: "STRING" },
-              description: "Pilihan jawaban (A, B, C, D) jika PG."
+              description: "Pilihan jawaban atau pernyataan. Wajib diisi (A, B, C, D) jika PG. Wajib diisi 4 pernyataan jika tipe Pilihan Ganda Kompleks (PGK)."
             },
-            answerKey: { type: "STRING", description: "Kunci jawaban (a, b, c, d untuk PG)." },
+            answerKey: { type: "STRING", description: "Kunci jawaban (a, b, c, d untuk PG. Untuk PGK dipisah koma misal A,C. Untuk Menjodohkan tulis kuncinya)." },
             alternativeAnswers: {
               type: "ARRAY",
               items: { type: "STRING" },
               description: "Jawaban alternatif untuk Isian/Uraian."
+            },
+            pairs: {
+              type: "ARRAY",
+              items: { 
+                type: "OBJECT",
+                properties: {
+                  question: { type: "STRING" },
+                  answer: { type: "STRING" }
+                },
+                required: ["question", "answer"]
+              },
+              description: "WAJIB DIISI HANYA UNTUK SOAL MENJODOHKAN. Berisi pasangan pertanyaan/pernyataan dan jawaban/pasangannya."
             },
             explanation: { type: "STRING", description: "Pembahasan singkat." },
             imageUrl: { type: "STRING", description: "URL gambar jika ada." },
@@ -940,7 +952,22 @@ export async function apiGenerateSoal(
         SANGAT PENTING:
         - Buat tepat sejumlah ${sanitizedKisiKisi.length} butir soal secara berurutan.
         - Kosongkan properti gambar (imageUrl, svgContent, imagePrompt, imagenPrompt) karena dilarang ada gambar di awal.
-        - Kembalikan JSON murni.
+        - JIKA TIPE "Pilihan Ganda Kompleks": Sediakan 4-5 "options". Kunci jawaban "answerKey" berisi huruf jawaban benar yang dipisah koma (misal: "A, C").
+        - JIKA TIPE "Menjodohkan": Anda WAJIB mengisi properti "pairs" dengan 3-4 pasang { question: "...", answer: "..." }. "questionText" bisa diisi instruksi seperti "Jodohkanlah pernyataan di kolom kiri dengan jawaban yang tepat di kolom kanan!". "options" dikosongkan.
+        
+        ATURAN KEBERAGAMAN & ACAK (SANGAT KETAT):
+        - TINGKAT KESULITAN & BAHASA: WAJIB memperhitungkan kemampuan murid berdasarkan KELAS yang diminta! Gunakan bahasa yang 100% cocok dengan tingkat kognitif siswa di kelas tersebut.
+        - CAPAIAN PEMBELAJARAN (CP): Soal wajib merujuk akurat pada materi dan Capaian Pembelajaran.
+        - SOAL ISIAN SINGKAT & URAIAN: 
+          * WAJIB membuat STIMULUS YANG MENARIK (percakapan, fabel, puisi, pengalaman sehari-hari, pantun) sebagai pengantar soal.
+          * Pertanyaan inti langsung ditanyakan TANPA titik-titik (.....).
+        - SETIAP NOMOR WAJIB BERBEDA! Jangan mengulang cerita, nama, atau latar yang sama di soal berikutnya.
+        - NAMA TOKOH: Gunakan nama beragam budaya/agama (misal: Ali, Yusuf, Yohanes, Maria, Wayan, Made, Budi, Siti). JANGAN ADA PENGULANGAN GELAR ganda seperti "Pak Guru Pak Hartono" atau "Ibu Guru Ibu Sri". Gunakan penulisan alami seperti "Pak Hartono", "Pak Guru Hartono", atau "Ibu Sri".
+        - LATAR TEMPAT: Bervariasi! Bisa di pasar, sawah, pegunungan, bukit, laut, sungai, perpustakaan, rumah sakit, lapangan. Sesekali Anda BISA menggunakan nama sekolah bernuansa NTT (seperti SD Negeri Fatubai, SD Inpres Nifuboke) secara proporsional dan tidak mendominasi seluruh soal.
+        - PROFESI/SUBJEK: Bervariasi! Gunakan paman, bibi, kakek, nenek, dokter, bidan, petani, nelayan, polisi, dsb.
+        - ACAK KUNCI JAWABAN: Pastikan huruf kunci jawaban (A, B, C, D) di setiap nomor sangat bervariasi dan diacak dengan benar-benar acak, bukan berpola urutan.
+        
+        Kembalikan JSON murni.
       `;
 
       const result = await callGeminiDirect(prompt, systemInstructionOverride, schema);
@@ -949,7 +976,30 @@ export async function apiGenerateSoal(
         // Normalize multiple choice options & answer key
         const normalized = result.map((q: any) => {
           const promptStr = q.imagePrompt || q.imagenPrompt || "";
-          if (q.questionType !== "Pilihan Ganda" || !q.options || q.options.length === 0) {
+          if (q.questionType === "Pilihan Ganda Kompleks") {
+            if (!q.options || q.options.length < 4) {
+              q.options = [
+                `Pernyataan 1 tentang ${q.materi || 'materi ini'}`,
+                `Pernyataan 2 tentang ${q.materi || 'materi ini'}`,
+                `Pernyataan 3 tentang ${q.materi || 'materi ini'}`,
+                `Pernyataan 4 tentang ${q.materi || 'materi ini'}`
+              ];
+            }
+            return { ...q, imagePrompt: promptStr, imagenPrompt: promptStr, materi: cleanMateri(q.materi || "") };
+          }
+
+          if (q.questionType === "Menjodohkan") {
+            if (!q.pairs || q.pairs.length < 3) {
+              q.pairs = [
+                { question: `Konsep A (${q.materi || 'Materi'})`, answer: "Pasangan A" },
+                { question: `Konsep B (${q.materi || 'Materi'})`, answer: "Pasangan B" },
+                { question: `Konsep C (${q.materi || 'Materi'})`, answer: "Pasangan C" }
+              ];
+            }
+            return { ...q, imagePrompt: promptStr, imagenPrompt: promptStr, materi: cleanMateri(q.materi || "") };
+          }
+
+          if (q.questionType !== "Pilihan Ganda") {
             return {
               ...q,
               imagePrompt: promptStr,
@@ -991,11 +1041,29 @@ export async function apiGenerateSoal(
             correctIdx = 0;
           }
 
+          // Force shuffle options right after generation to destroy any LLM sequential pattern
+          const originalCorrectOpt = opts[correctIdx];
+          const rawOpts = opts.map(opt => opt.replace(/^[A-D][.\s)]+/, "").trim());
+          const rawCorrectText = originalCorrectOpt.replace(/^[A-D][.\s)]+/, "").trim();
+          
+          for (let i = rawOpts.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [rawOpts[i], rawOpts[j]] = [rawOpts[j], rawOpts[i]];
+          }
+          
+          let newCorrectIdx = 0;
+          const shuffledOpts = rawOpts.map((opt, idx) => {
+            if (opt === rawCorrectText) {
+              newCorrectIdx = idx;
+            }
+            return `${String.fromCharCode(65 + idx)}. ${opt}`;
+          });
+
           return {
             ...q,
             materi: cleanMateri(q.materi || ""),
-            options: opts,
-            answerKey: String.fromCharCode(97 + correctIdx),
+            options: shuffledOpts,
+            answerKey: String.fromCharCode(97 + newCorrectIdx),
             imagePrompt: promptStr,
             imagenPrompt: promptStr
           };

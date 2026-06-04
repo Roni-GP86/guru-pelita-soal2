@@ -7,7 +7,9 @@ import SubjectAndTopicManager from "./components/SubjectAndTopicManager";
 import QuestionConfigForm from "./components/QuestionConfigForm";
 import KisiKisiView from "./components/KisiKisiView";
 import SoalUjianView from "./components/SoalUjianView";
+import TutorialView from "./components/TutorialView";
 import PremiumLoader from "./components/PremiumLoader";
+import OpeningSplash from "./components/OpeningSplash";
 import { apiGenerateKisiKisi, apiGenerateSoal } from "./apiClient";
 import {
   School,
@@ -31,7 +33,10 @@ import {
   Unlock,
   Copy,
   Trash,
-  X
+  X,
+  PlayCircle,
+  Megaphone,
+  Bell
 } from "lucide-react";
 
 export default function App() {
@@ -443,6 +448,12 @@ export default function App() {
   const [waAlert, setWaAlert] = useState<boolean>(() => {
     return localStorage.getItem("ttu_wa_alert_dismissed") !== "true";
   });
+  
+  // Opening Splash State
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    if (sessionStorage.getItem("ttu_splash_shown")) return false;
+    return true;
+  });
 
   // 2. LocalStorage syncing
   useEffect(() => {
@@ -472,6 +483,28 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("ttu_generated_questions", JSON.stringify(questions));
   }, [questions]);
+
+  // Sync API Keys from Firestore so ALL users can use the Admin's rotating pool
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "systemSettings", "geminiKeys"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.key1) {
+          localStorage.setItem("ttu_system_key_1", data.key1);
+          setAdminKey1(data.key1);
+        }
+        if (data.key2) {
+          localStorage.setItem("ttu_system_key_2", data.key2);
+          setAdminKey2(data.key2);
+        }
+        if (data.key3) {
+          localStorage.setItem("ttu_system_key_3", data.key3);
+          setAdminKey3(data.key3);
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Reset current assessment state to start fresh
   const handleResetWorkspace = () => {
@@ -531,7 +564,27 @@ export default function App() {
         fetchedData
       );
 
-      setKisiKisi(data);
+      const questionTypeOrder: Record<string, number> = {
+        "Pilihan Ganda": 1,
+        "Pilihan Ganda Kompleks": 2,
+        "Menjodohkan": 3,
+        "Isian Singkat": 4,
+        "Uraian": 5
+      };
+
+      const sortedData = data.sort((a: any, b: any) => {
+        const orderA = questionTypeOrder[a.questionType] || 99;
+        const orderB = questionTypeOrder[b.questionType] || 99;
+        return orderA - orderB;
+      });
+
+      // Assign contiguous numbers after sorting
+      const finalizedData = sortedData.map((item: any, idx: number) => ({
+        ...item,
+        number: idx + 1
+      }));
+
+      setKisiKisi(finalizedData);
       // Clean stale question results since matrix changed or was regenerated
       setQuestions([]);
       // Jump immediately to Step 4 (Kisi-Kisi View)
@@ -706,6 +759,15 @@ export default function App() {
 
   return (
     <div id="app-root-container" className="min-h-screen comel-dot-pattern text-slate-300 flex flex-col font-sans selection:bg-blue-600/30 selection:text-white antialiased relative overflow-hidden">
+      
+      {/* CINEMATIC OPENING SPLASH */}
+      {showSplash && (
+        <OpeningSplash onFinish={() => {
+          setShowSplash(false);
+          sessionStorage.setItem("ttu_splash_shown", "true");
+        }} />
+      )}
+
       {/* Decorative colored glow strip of Blue, Black/Slate, Yellow Gold, Orange, and Glowing Green */}
       <div className="h-2 w-full bg-gradient-to-r from-blue-600 via-slate-950 via-amber-400 via-orange-500 to-emerald-400 relative z-50 animate-pulse"></div>
 
@@ -829,8 +891,44 @@ export default function App() {
               </div>
             </div>
 
-            {/* Action Buttons: Minta Kode & Menu Pesan - BESIDE each other, highly prominent */}
+            {/* Action Buttons: Minta Kode, Menu Pesan & Lonceng */}
             <div className="flex flex-row items-center gap-2">
+              
+              {/* Notification Bell */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (isAdmin) {
+                    setActiveStep(6);
+                    setSuccessToast("Membuka Menu Kode: Ada request baru yang masuk!");
+                  } else {
+                    if (matchedRequest && matchedRequest.isActive) {
+                      setSuccessToast("Selamat! Kode Akses Anda telah diaktifkan oleh Admin!");
+                    } else {
+                      setWarningToast("Belum ada notifikasi baru.");
+                    }
+                  }
+                }}
+                className={`relative p-2.5 rounded-xl border transition-all duration-300 flex items-center justify-center cursor-pointer shrink-0 shadow-md active:scale-95 ${
+                  (isAdmin && codeRequests.some(r => r.isActive === false)) || (!isAdmin && matchedRequest && matchedRequest.isActive === true)
+                    ? "bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500 hover:text-slate-900" 
+                    : "bg-slate-950/40 border-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-900"
+                }`}
+                title="Notifikasi Aktivasi"
+              >
+                <Bell size={16} className={
+                  ((isAdmin && codeRequests.some(r => r.isActive === false)) || (!isAdmin && matchedRequest && matchedRequest.isActive === true))
+                  ? "animate-pulse" 
+                  : ""
+                } />
+                {((isAdmin && codeRequests.some(r => r.isActive === false)) || (!isAdmin && matchedRequest && matchedRequest.isActive === true)) && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 border-2 border-slate-900"></span>
+                  </span>
+                )}
+              </button>
+
               {/* MINTA KODE */}
               <button 
                 type="button"
@@ -945,6 +1043,37 @@ export default function App() {
 
             {/* Sidebar Step Tabs */}
             <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible gap-2.5 pb-2.5 lg:pb-0 scrollbar-hide">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveStep(0);
+                  setSidebarOpen(false);
+                }}
+                className={`flex flex-row items-center gap-3.5 p-3 rounded-xl border transition-all duration-300 shrink-0 w-[190px] lg:w-full group relative cursor-pointer ${
+                  activeStep === 0
+                    ? "bingkai-emas-tab-active scale-[1.01]"
+                    : "border-rose-500/40 bg-rose-950/20 text-rose-400 hover:bg-rose-900/40 hover:border-rose-500"
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl relative shrink-0 transition-transform group-hover:scale-105 duration-300 ${
+                  activeStep === 0 ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"
+                }`}>
+                  <Megaphone size={22} className="stroke-[2.5]" />
+                  {/* Blinking alarm badge */}
+                  <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500 border-2 border-slate-900"></span>
+                  </span>
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${
+                    activeStep === 0 ? "text-amber-500" : "text-slate-500 group-hover:text-slate-400"
+                  }`}>Pusat Tautan</span>
+                  <span className={`text-sm font-black tracking-tight mt-0.5 transition-colors ${
+                    activeStep === 0 ? "text-slate-100" : "group-hover:text-rose-300"
+                  }`}>INFORMASI</span>
+                </div>
+              </button>
               {stepsList.map((step) => {
                 const isActive = activeStep === step.num;
                 const isCompleted = (kisiKisi.length > 0 && step.num < 4) || (questions.length > 0 && step.num < 5);
@@ -1016,6 +1145,10 @@ export default function App() {
         {/* Main Workspace Area */}
         <main className="flex-1 px-5 py-5 md:px-6 md:py-6 space-y-5 min-w-0 bg-slate-950/20 relative z-10">
           
+          {activeStep === 0 && (
+            <TutorialView isAdmin={isAdmin} onShowToast={setSuccessToast} />
+          )}
+
           {/* USER ACCESS CODE NOTIFICATION AREA */}
           {activeStep === 1 && matchedRequest && !isBannerDismissed && (
             matchedRequest.isActive === false ? (
@@ -1163,7 +1296,7 @@ export default function App() {
 
               {activeStep === 3 && (
                 <div className="space-y-6">
-                  <QuestionConfigForm configs={questionConfigs} onChange={setQuestionConfigs} />
+                  <QuestionConfigForm configs={questionConfigs} onChange={setQuestionConfigs} gradeClass={effectiveSchoolInfo.gradeClass} />
                   
                   <div className="bingkai-emas-premium p-6 md:p-8 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
                     <div>
@@ -1356,50 +1489,6 @@ export default function App() {
                         <h3 className="font-bold text-slate-200 text-sm">Daftar Request Kode Masuk</h3>
                         <p className="text-[11px] text-slate-500 mt-0.5">Database riwayat pengisian formulir kode aktivasi dari WhatsApp Kontak.</p>
                       </div>
-                      
-                      {/* Simulation Creator */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const idVal = "req-" + Date.now();
-                          const mockSh = [
-                            "SD Negeri Pelosok Indah",
-                            "SD Inpres Fatumuti",
-                            "SMP Negeri Satu Atap Pelosok",
-                            "SD Kristen Nusantara",
-                            "SD Katolik St. Yosef"
-                          ][Math.floor(Math.random() * 5)];
-                          const mockName = [
-                            "Martha S. Sogen, S.Pd.",
-                            "Robertus K. Suban, S.Pd.SD",
-                            "Yuliana M. Barek, S.Pd.",
-                            "Antonius Lano, S.Pd.Gr.",
-                            "Elisabeth K. Nunis, S.Pd."
-                          ][Math.floor(Math.random() * 5)];
-                          const mockRoles = ["Guru Kelas", "Guru Mata Pelajaran"];
-                          const chosenRole = mockRoles[Math.floor(Math.random() * 2)];
-                          const mockSubj = chosenRole === "Guru Kelas" ? "Bahasa Inggris" : ["PJOK", "Pendidikan Agama Katolik", "Pendidikan Agama Islam"][Math.floor(Math.random() * 3)];
-                          const randomCode = "GP-PS" + String(Math.floor(Math.random() * 90) + 10) + ["R", "A", "K", "I", "P"][Math.floor(Math.random() * 5)];
-                          
-                           const newRequest = {
-                            id: idVal,
-                            schoolName: mockSh,
-                            teacherName: mockName,
-                            role: chosenRole,
-                            subject: mockSubj,
-                            whatsappNumber: "082" + String(Math.floor(Math.random() * 10000000) + 10000000),
-                            uniqueCode: randomCode,
-                            isActive: true,
-                            timestamp: new Date().toLocaleString("id-ID")
-                          };
-                          
-                          setCodeRequests(prev => [newRequest, ...prev]);
-                          setSuccessToast(`Simulasi request baru dibuat: ${randomCode}!`);
-                        }}
-                        className="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black rounded-xl inline-flex items-center gap-1.5 transition-all shadow-md shadow-purple-500/10 cursor-pointer active:scale-95"
-                      >
-                        <Trash size={12} className="rotate-45" /> Buat Simulasi Request Kode Baru
-                      </button>
                     </div>
 
                     {codeRequests.length === 0 ? (

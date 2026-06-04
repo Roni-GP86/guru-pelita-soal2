@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { SchoolInfo, QuestionItem } from "../types";
 import PremiumLoader from "./PremiumLoader";
 import QuestionWithImage from "./QuestionWithImage";
@@ -619,7 +619,9 @@ export const getQuestionMaxScore = (type: string, q?: QuestionItem): number => {
   } else if (cleanType === "uraian") {
     return 5;
   } else if (cleanType.includes("kompleks")) {
-    return 3; // default dynamic max score for complex multiple choice
+    return q && q.options ? Math.min(q.options.length, 4) : 4; 
+  } else if (cleanType === "menjodohkan") {
+    return q && q.pairs ? q.pairs.length : 3;
   } else {
     if (q && q.options && q.options.length > 0) {
       return Math.min(q.options.length, 3);
@@ -767,7 +769,8 @@ const renderStimulusText = (text: string, questionText?: string) => {
               marginBottom: "6px",
               lineHeight: "1.5",
               fontFamily: '"Times New Roman", Times, serif',
-              fontSize: "12pt"
+              fontSize: "12pt",
+              textAlign: "justify"
             }}
           >
             {trimmed}
@@ -812,20 +815,60 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
   const hasLeft = !!leftLogo;
   const hasRight = !!rightLogo;
 
+  const [logo1Size, setLogo1Size] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ttu_logo1_size");
+      const parsed = saved ? JSON.parse(saved) : null;
+      return (parsed && typeof parsed === 'object' && 'w' in parsed && 'h' in parsed) ? parsed : { w: 58, h: 68 };
+    } catch (e) {
+      return { w: 58, h: 68 };
+    }
+  });
+  const [logo2Size, setLogo2Size] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ttu_logo2_size");
+      const parsed = saved ? JSON.parse(saved) : null;
+      return (parsed && typeof parsed === 'object' && 'w' in parsed && 'h' in parsed) ? parsed : { w: 130, h: 82 };
+    } catch (e) {
+      return { w: 130, h: 82 };
+    }
+  });
+
+  useEffect(() => {
+    const handleLogoSizeChanged = () => {
+      try {
+        const saved1 = localStorage.getItem("ttu_logo1_size");
+        const parsed1 = saved1 ? JSON.parse(saved1) : null;
+        if (parsed1 && typeof parsed1 === 'object' && 'w' in parsed1 && 'h' in parsed1) {
+          setLogo1Size(parsed1);
+        }
+      } catch (e) {}
+      try {
+        const saved2 = localStorage.getItem("ttu_logo2_size");
+        const parsed2 = saved2 ? JSON.parse(saved2) : null;
+        if (parsed2 && typeof parsed2 === 'object' && 'w' in parsed2 && 'h' in parsed2) {
+          setLogo2Size(parsed2);
+        }
+      } catch (e) {}
+    };
+    window.addEventListener("logoSizeChanged", handleLogoSizeChanged);
+    return () => window.removeEventListener("logoSizeChanged", handleLogoSizeChanged);
+  }, []);
+
   let leftWidth = "0%";
   let centerWidth = "100%";
   let rightWidth = "0%";
 
   if (hasLeft && hasRight) {
-    leftWidth = "12%";
-    centerWidth = "76%";
-    rightWidth = "12%";
+    leftWidth = "15%";
+    centerWidth = "70%";
+    rightWidth = "15%";
   } else if (hasLeft) {
-    leftWidth = "12%";
-    centerWidth = "88%";
+    leftWidth = "15%";
+    centerWidth = "85%";
   } else if (hasRight) {
-    centerWidth = "88%";
-    rightWidth = "12%";
+    centerWidth = "85%";
+    rightWidth = "15%";
   }
 
   const handleBatchGenerateImages = async () => {
@@ -843,6 +886,97 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
       console.error("Batch image generation failed:", err);
     } finally {
       setGeneratingBatchImages(false);
+    }
+  };
+
+  const handleShufflePaketB = () => {
+    // Group by type
+    const groups: Record<string, QuestionItem[]> = {};
+    questions.forEach(q => {
+      if (!groups[q.questionType]) groups[q.questionType] = [];
+      groups[q.questionType].push({...q});
+    });
+
+    let newNumber = 1;
+    const newQuestions: QuestionItem[] = [];
+
+    const shuffleArray = <T,>(arr: T[]): T[] => {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    };
+
+    const typeOrder = ["Pilihan Ganda", "Pilihan Ganda Kompleks", "Menjodohkan", "Isian Singkat", "Uraian"];
+    const existingTypes = Object.keys(groups).sort((a,b) => {
+      const ia = typeOrder.indexOf(a);
+      const ib = typeOrder.indexOf(b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    existingTypes.forEach(type => {
+      let shuffledGroup = shuffleArray(groups[type]);
+      
+      shuffledGroup = shuffledGroup.map(q => {
+        if (q.questionType === "Pilihan Ganda" && q.options && q.options.length > 0) {
+          const correctLetter = q.answerKey.trim().toUpperCase();
+          const correctIdx = correctLetter.charCodeAt(0) - 65;
+          let correctText = "";
+          if (correctIdx >= 0 && correctIdx < q.options.length) {
+            correctText = q.options[correctIdx].replace(/^[A-D]\.\s*/, "").trim();
+          }
+
+          const rawOptions = q.options.map(opt => opt.replace(/^[A-D]\.\s*/, "").trim());
+          const shuffledRaw = shuffleArray(rawOptions);
+          
+          let newCorrectLetter = "A";
+          const newOptions = shuffledRaw.map((opt, idx) => {
+            if (opt === correctText) {
+              newCorrectLetter = String.fromCharCode(65 + idx);
+            }
+            return `${String.fromCharCode(65 + idx)}. ${opt}`;
+          });
+
+          return { ...q, number: newNumber++, options: newOptions, answerKey: newCorrectLetter };
+        } else if (q.questionType === "Pilihan Ganda Kompleks" && q.options && q.options.length > 0) {
+          const correctLetters = q.answerKey.toUpperCase().split(/[,;]/).map(k => k.trim());
+          const correctTexts = correctLetters.map(letter => {
+            const idx = letter.charCodeAt(0) - 65;
+            if (idx >= 0 && idx < q.options!.length) {
+              return q.options![idx].replace(/^[A-E]\.\s*/, "").trim();
+            }
+            return "";
+          }).filter(Boolean);
+
+          const rawOptions = q.options.map(opt => opt.replace(/^[A-E]\.\s*/, "").trim());
+          const shuffledRaw = shuffleArray(rawOptions);
+
+          const newCorrectLetters: string[] = [];
+          const newOptions = shuffledRaw.map((opt, idx) => {
+            if (correctTexts.includes(opt)) {
+              newCorrectLetters.push(String.fromCharCode(65 + idx));
+            }
+            return `${String.fromCharCode(65 + idx)}. ${opt}`;
+          });
+
+          return { ...q, number: newNumber++, options: newOptions, answerKey: newCorrectLetters.sort().join(",") };
+        } else if (q.questionType === "Menjodohkan" && q.pairs && q.pairs.length > 0) {
+           const shuffledPairs = shuffleArray(q.pairs);
+           return { ...q, number: newNumber++, pairs: shuffledPairs };
+        }
+        return { ...q, number: newNumber++ };
+      });
+      newQuestions.push(...shuffledGroup);
+    });
+
+    if (onUpdateQuestions) {
+      onUpdateQuestions(newQuestions);
+      alert("✅ Sukses! Naskah soal telah diacak secara cerdas menjadi 'Paket B' (urutan soal dan posisi A,B,C,D telah ditukar). Kunci jawaban juga telah disesuaikan secara otomatis!");
     }
   };
 
@@ -948,15 +1082,19 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
             font-size: 12pt;
             line-height: 1.5;
             color: #000000;
+            text-align: left;
           }
-          p { margin: 0px 0px 5px 0px; }
+          p { 
+            margin: 0px 0px 5px 0px; 
+            text-align: left;
+          }
           .kop {
             text-align: center;
             margin-bottom: 15px;
             border-bottom: 3.5px double black;
             padding-bottom: 10px;
           }
-          .kop-b1 { font-size: 14pt; font-weight: bold; text-transform: uppercase; }
+          .kop-b1 { font-size: 11pt !important; font-weight: bold; text-transform: uppercase; white-space: nowrap !important; }
           .kop-b2 { font-size: 12pt; font-weight: bold; text-transform: uppercase; }
           .kop-b3 { font-size: 15pt; font-weight: bold; text-transform: uppercase; }
           .kop-b4 { font-size: 10pt; font-style: italic; }
@@ -981,14 +1119,14 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
             font-size: 12pt;
             line-height: 1.5;
           }
-          .stimulus {
+          .stimulus, .stimulus-wrapper {
             background-color: #ffffff;
-            border-left: 3px solid #000000;
-            padding: 8px 12px;
-            margin: 10px 0px;
+            padding: 0px;
+            margin: 0px 0px 4px 0px;
             font-style: normal;
             font-size: 12pt;
             line-height: 1.5;
+            text-align: left;
           }
           .question-block {
             margin-bottom: 18px;
@@ -1051,6 +1189,63 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
     // Hapus semua elemen: button, elemen no-print, no-export
     const uiSelectors = 'button, .no-print, [data-no-export], .no-export, svg';
     clonedElement.querySelectorAll(uiSelectors).forEach(el => el.remove());
+
+    // In clonedElement, replace the grid of PG answers with a table for Word compatibility
+    const pgGrid = clonedElement.querySelector('.grid-cols-2, .grid-cols-5, .grid');
+    if (pgGrid) {
+      const pgQuestions = questions.filter(q => q.questionType === "Pilihan Ganda");
+      if (pgQuestions.length > 0) {
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.marginBottom = '20px';
+        table.style.fontFamily = '"Times New Roman", Times, serif';
+        table.style.fontSize = '12pt';
+        
+        const tbody = document.createElement('tbody');
+        const cols = 5;
+        for (let i = 0; i < pgQuestions.length; i += cols) {
+          const tr = document.createElement('tr');
+          for (let j = 0; j < cols; j++) {
+            const td = document.createElement('td');
+            td.style.border = '1px solid #000000';
+            td.style.padding = '6px';
+            td.style.textAlign = 'center';
+            td.style.width = `${100 / cols}%`;
+            
+            const q = pgQuestions[i + j];
+            if (q) {
+              td.innerHTML = `<b>No. ${q.number}:</b> ${q.answerKey.trim().toUpperCase()}`;
+            } else {
+              td.innerHTML = '&nbsp;';
+            }
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        pgGrid.parentNode?.replaceChild(table, pgGrid);
+      }
+    }
+
+    // Force standard Times New Roman, line-height 1.5, and text-align justify inline style properties on all cloned elements
+    clonedElement.querySelectorAll('*').forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      htmlEl.style.fontFamily = '"Times New Roman", Times, serif';
+      htmlEl.style.lineHeight = '1.5';
+      htmlEl.style.color = '#000000';
+      
+      const tagName = htmlEl.tagName.toLowerCase();
+      if (tagName === 'p' || tagName === 'li' || tagName === 'td' || tagName === 'div' || tagName === 'span') {
+        if (htmlEl.style.textAlign !== 'center' && htmlEl.style.textAlign !== 'right') {
+          htmlEl.style.textAlign = 'justify';
+        }
+      }
+      if (tagName === 'p') {
+        htmlEl.style.marginTop = '0px';
+        htmlEl.style.marginBottom = '6px';
+      }
+    });
 
     // ===== KONVERSI SEMUA GAMBAR KE BASE64 =====
     // Agar gambar muncul di semua versi Word/Windows tanpa bergantung internet
@@ -1134,33 +1329,89 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
     setIsExporting(true);
 
     // Smooth delay for premium circular progress presentation
-    await new Promise((resolve) => setTimeout(resolve, 2200));
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
     try {
-      const html2pdf = await getHtml2Pdf();
-      const fileSuffix = activeTab === "siswa" 
-        ? "Naskah_Soal" 
-        : activeTab === "kunci" 
-          ? "Kunci_Jawaban" 
-          : "Pedoman_Penskoran";
-      const filename = `${fileSuffix}_${subject.replace(/\s+/g, "_")}_${schoolInfo.gradeClass.replace(/\s+/g, "_")}.pdf`;
-      const opt = {
-        margin: [15, 15, 15, 15] as [number, number, number, number], // specify [top, left, bottom, right] explicitly to ensure clean upper and lower page boundaries
-        filename: filename,
-        image: { type: "jpeg" as const, quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
-        pagebreak: { 
-          mode: ["css", "legacy"], 
-          avoid: [".signature-table", "tr", ".key-block", ".question-block", "h4", "table", ".formula-block", ".identitas-table"] 
-        }
-      };
+      // Inject a temporary print-only stylesheet that hides everything except the document
+      const printStyleId = "pelita-soal-print-style";
+      let printStyle = document.getElementById(printStyleId) as HTMLStyleElement | null;
+      if (!printStyle) {
+        printStyle = document.createElement("style");
+        printStyle.id = printStyleId;
+        document.head.appendChild(printStyle);
+      }
 
-      await withPdfStylesPatch(async () => {
-        await html2pdf().set(opt).from(printAreaRef.current).save();
-      });
+      const fileSuffix = activeTab === "siswa" 
+        ? "Naskah Soal" 
+        : activeTab === "kunci" 
+          ? "Kunci Jawaban" 
+          : "Pedoman Penskoran";
+
+      printStyle.innerHTML = `
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 20mm 20mm 20mm 20mm;
+          }
+          /* Hide everything on the page */
+          body > * { display: none !important; }
+          /* Show only the print area */
+          #soal-ujian-print-area,
+          #soal-ujian-print-area * {
+            display: revert !important;
+            visibility: visible !important;
+          }
+          /* Position the print area to fill the page */
+          #soal-ujian-print-area {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            background: white !important;
+            font-family: "Times New Roman", Times, serif !important;
+            font-size: 12pt !important;
+            line-height: 1.5 !important;
+            color: #000000 !important;
+          }
+          /* Ensure buttons and UI elements are hidden */
+          button, .no-print, [data-no-export], .no-export,
+          .bingkai-emas-premium > :not(.lg\\:col-span-4),
+          nav, header, aside { display: none !important; }
+          /* Default text: rata kiri */
+          p, div, li, span, td { 
+            text-align: left !important;
+          }
+          /* KOP dan Judul: rata tengah */
+          .kop, .kop *, .document-title, .signature-table td, th, .text-center {
+            text-align: center !important;
+          }
+          /* Page break controls */
+          .question-block, tr, .signature-table, .key-block, .identitas-table {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          /* Remove screen-only decorations */
+          * { 
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `;
+
+      // Trigger print dialog
+      window.print();
+
+      // Cleanup after dialog closes
+      setTimeout(() => {
+        printStyle!.innerHTML = "";
+      }, 2000);
+
     } catch (err: any) {
-      console.error("Gagal mendownload PDF:", err);
+      console.error("Gagal mencetak PDF:", err);
     } finally {
       setIsExporting(false);
       setDownloadingPdf(false);
@@ -1284,6 +1535,8 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
   // Group questions by type to follow formal exam layout sections:
   // Bagian I: Pilihan Ganda, Bagian II: Isian Singkat, Bagian III: Uraian
   const pgQuestions = questions.filter((q) => q.questionType === "Pilihan Ganda");
+  const pgkQuestions = questions.filter((q) => q.questionType === "Pilihan Ganda Kompleks");
+  const menjodohkanQuestions = questions.filter((q) => q.questionType === "Menjodohkan");
   const isianQuestions = questions.filter((q) => q.questionType === "Isian Singkat");
   const uraianQuestions = questions.filter((q) => q.questionType === "Uraian");
 
@@ -1355,6 +1608,16 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
               <span className="text-sm">✨</span> Buat Gambar AI
             </button>
           )}
+
+          <button
+            id="btn-shuffle-paket-b"
+            type="button"
+            onClick={handleShufflePaketB}
+            disabled={downloadingPdf || isExporting}
+            className="px-3.5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-black text-[11px] rounded-xl inline-flex items-center gap-1.5 transition-all duration-300 shadow-md hover:shadow-indigo-500/25 cursor-pointer disabled:opacity-50"
+          >
+            <span className="text-sm">🔀</span> Acak Paket B
+          </button>
 
           <div className="flex flex-wrap items-center bg-slate-950 border border-slate-850 p-1 rounded-2xl text-xs shadow-xs gap-0.5">
             <button
@@ -1474,7 +1737,7 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
             ref={printAreaRef}
             id="soal-ujian-print-area"
             className="max-w-[700px] mx-auto bg-white p-10 md:p-12"
-            style={{ fontFamily: '"Times New Roman", Times, serif', color: "#000000", fontSize: "12pt", lineHeight: "1.5" }}
+            style={{ fontFamily: '"Times New Roman", Times, serif', color: "#000000", fontSize: "12pt", lineHeight: "1.5", textAlign: "left" }}
           >
             {/* Global Printable PDF & Page Break Styles to protect top/bottom page boundaries */}
             <style dangerouslySetInnerHTML={{ __html: `
@@ -1505,6 +1768,46 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
               table {
                 page-break-inside: auto;
               }
+              /* PDF Generation Mode styles to ensure high quality A4 portrait print layout */
+              .pdf-export-mode-soal {
+                max-width: 100% !important;
+                padding: 20px !important;
+                margin: 0 auto !important;
+                box-shadow: none !important;
+                border: none !important;
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                overflow-x: hidden !important;
+              }
+              .pdf-export-mode-soal table {
+                max-width: 100% !important;
+                table-layout: fixed !important;
+                word-break: break-word !important;
+              }
+              .pdf-export-mode-soal .kop table {
+                table-layout: auto !important;
+              }
+              .pdf-export-mode-soal img {
+                max-width: 100% !important;
+                height: auto !important;
+              }
+              .pdf-export-mode-soal p, .pdf-export-mode-soal div, .pdf-export-mode-soal td, .pdf-export-mode-soal span {
+                text-align: left !important;
+                font-family: "Times New Roman", Times, serif !important;
+                line-height: 1.5 !important;
+                color: #000000 !important;
+                word-break: break-word !important;
+                overflow-wrap: break-word !important;
+              }
+              .pdf-export-mode-soal .kop, 
+              .pdf-export-mode-soal .kop *, 
+              .pdf-export-mode-soal .document-title, 
+              .pdf-export-mode-soal .signature-table td, 
+              .pdf-export-mode-soal th,
+              .pdf-export-mode-soal .text-center,
+              .pdf-export-mode-soal [style*="text-align: center"] {
+                text-align: center !important;
+              }
             `}} />
             {/* SAKLAR TAMPILAN SISWA */}
             {activeTab === "siswa" && (
@@ -1516,39 +1819,39 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                       <tr style={{ border: "none" }}>
                         {/* Sisi Kiri: Logo Kabupaten */}
                         {hasLeft && (
-                          <td style={{ border: "none", width: leftWidth, textAlign: "center", verticalAlign: "middle", paddingRight: "10px" }}>
+                          <td style={{ border: "none", width: leftWidth, textAlign: "center", verticalAlign: "top", paddingRight: "8px" }}>
                             <img 
                               src={leftLogo!} 
                               alt="Logo Kabupaten" 
-                              style={{ height: "75px", width: "75px", display: "inline-block", objectFit: "contain" }} 
+                              style={{ height: `${logo1Size.h}px`, width: `${logo1Size.w}px`, display: "inline-block", objectFit: "fill" }} 
                               referrerPolicy="no-referrer"
                             />
                           </td>
                         )}
                         
                         {/* Tengah: Identitas Lembaga */}
-                        <td style={{ border: "none", width: centerWidth, textAlign: "center", verticalAlign: "middle" }}>
-                          <p className="kop-b1" style={{ margin: "0px", fontSize: "14pt", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: "1.2" }}>
+                        <td style={{ border: "none", width: centerWidth, textAlign: "center", verticalAlign: "top" }}>
+                          <p className="kop-b1" style={{ margin: "0px", fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: "1.2", whiteSpace: "nowrap" }}>
                             {schoolInfo.governmentName || "Pemerintah Kabupaten / Kota"}
                           </p>
-                          <p className="kop-b2" style={{ margin: "2px 0px", fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
+                          <p className="kop-b2" style={{ margin: "1px 0px", fontSize: "10.5pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
                             {schoolInfo.educationDepartment || "Dinas Pendidikan dan Kebudayaan"}
                           </p>
-                          <p className="kop-b3" style={{ margin: "2px 0px", fontSize: "15pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
+                          <p className="kop-b3" style={{ margin: "1px 0px", fontSize: "14pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
                             {schoolInfo.schoolName || "SD NEGERI KABUPATEN"}
                           </p>
-                          <p className="kop-b4" style={{ margin: "2px 0px 0px 0px", fontSize: "9.5pt", fontStyle: "italic", lineHeight: "1.2", fontWeight: "normal" }}>
+                          <p className="kop-b4" style={{ margin: "2px 0px 0px 0px", fontSize: "9pt", fontStyle: "italic", lineHeight: "1.2", fontWeight: "normal" }}>
                             Alamat: {schoolInfo.schoolAddress || "Alamat Lengkap Lembaga Pendidikan"}
                           </p>
                         </td>
 
                         {/* Sisi Kanan: Logo Sekolah */}
                         {hasRight && (
-                          <td style={{ border: "none", width: rightWidth, textAlign: "center", verticalAlign: "middle", paddingLeft: "10px" }}>
+                          <td style={{ border: "none", width: rightWidth, textAlign: "center", verticalAlign: "top", paddingLeft: "8px" }}>
                             <img 
                               src={rightLogo!} 
                               alt="Logo Sekolah" 
-                              style={{ height: "75px", width: "75px", display: "inline-block", objectFit: "contain" }} 
+                              style={{ height: `${logo2Size.h}px`, width: `${logo2Size.w}px`, display: "inline-block", objectFit: "fill" }} 
                               referrerPolicy="no-referrer"
                             />
                           </td>
@@ -1587,12 +1890,29 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                   </tbody>
                 </table>
 
-                {/* BAGIAN I: PILIHAN GANDA */}
-                {pgQuestions.length > 0 && (
-                  <div style={{ marginBottom: "25px" }}>
-                    <h4 style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", borderBottom: "1px solid #ddd", paddingBottom: "3px", marginBottom: "12px" }}>
-                      PETUNJUK A: Pilihlah satu jawaban yang paling benar (A, B, C, atau D) di bawah ini!
-                    </h4>
+                {/* Dynamic Section Letters Helper */}
+                {(() => {
+                  const sections = [
+                    { id: "pg", active: pgQuestions.length > 0 },
+                    { id: "pgk", active: pgkQuestions.length > 0 },
+                    { id: "menjodohkan", active: menjodohkanQuestions.length > 0 },
+                    { id: "isian", active: isianQuestions.length > 0 },
+                    { id: "uraian", active: uraianQuestions.length > 0 },
+                  ].filter(s => s.active);
+                  const getLetter = (id: string) => {
+                    const idx = sections.findIndex(s => s.id === id);
+                    return idx !== -1 ? String.fromCharCode(65 + idx) + "." : "";
+                  };
+
+                  return (
+                    <>
+                      {/* BAGIAN I: PILIHAN GANDA */}
+                      {pgQuestions.length > 0 && (
+                        <div style={{ marginBottom: "25px" }}>
+                          <h4 style={{ fontSize: "11pt", fontWeight: "bold", borderBottom: "1px solid #ddd", paddingBottom: "3px", marginBottom: "12px" }}>
+                            {getLetter("pg")} Pilihan Ganda<br/>
+                            <span style={{ fontSize: "10pt", fontWeight: "normal", fontStyle: "italic" }}>Petunjuk: Pilihlah satu jawaban yang paling tepat!</span>
+                          </h4>
                     {pgQuestions.map((q, qIdx) => (
                       <div key={q.number} className="question-block group relative" style={{ marginBottom: "24px", pageBreakInside: "avoid" }}>
                         
@@ -1608,22 +1928,44 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                           </button>
                         )}
 
-                        <p style={{ fontWeight: "normal", fontSize: "12pt", margin: "0px", lineHeight: "1.5" }}>
-                          <strong>{qIdx + 1}.</strong> {renderStimulusText(q.stimulusText, q.questionText)}
-                          {q.questionText}
-                        </p>
+                        {/* Question: nomor + stimulus pada baris 1, soal pada baris 2 */}
+                        {q.stimulusText && q.stimulusText.trim() &&
+                          !cleanForCompare(q.stimulusText).includes(cleanForCompare(q.questionText)) &&
+                          !cleanForCompare(q.questionText).includes(cleanForCompare(q.stimulusText))
+                        ? (
+                          <>
+                            <p style={{ fontWeight: "normal", fontSize: "12pt", margin: "0px 0px 4px 0px", lineHeight: "1.5", textAlign: "left" }}>
+                              <strong>{qIdx + 1}.</strong> {q.stimulusText}
+                            </p>
+                            <p style={{ fontWeight: "normal", fontSize: "12pt", margin: "0px", lineHeight: "1.5", textAlign: "left", paddingLeft: "20px" }}>
+                              {q.questionText}
+                            </p>
+                          </>
+                        ) : (
+                          <p style={{ fontWeight: "normal", fontSize: "12pt", margin: "0px", lineHeight: "1.5", textAlign: "left" }}>
+                            <strong>{qIdx + 1}.</strong> {q.questionText}
+                          </p>
+                        )}
                         {renderQuestionIllustration(q, subject)}
                         
                         {q.options && q.options.length > 0 && (
-                          <table className="options-grid" style={{ fontFamily: '"Times New Roman", Times, serif', width: "100%", marginLeft: "20px", marginTop: "4px" }}>
+                          <table className="options-grid" style={{ fontFamily: '"Times New Roman", Times, serif', width: "calc(100% - 20px)", marginLeft: "20px", marginTop: "6px", borderCollapse: "collapse" }}>
                             <tbody>
                               <tr>
-                                <td style={{ width: "50%", border: "none", padding: "1px 0px", fontSize: "12pt", lineHeight: "1.5" }}>{q.options[0]}</td>
-                                <td style={{ width: "50%", border: "none", padding: "1px 0px", fontSize: "12pt", lineHeight: "1.5" }}>{q.options[1]}</td>
+                                <td style={{ width: "50%", border: "none", padding: "2px 8px 2px 0px", fontSize: "12pt", lineHeight: "1.5", verticalAlign: "top" }}>
+                                  <span style={{ fontWeight: "bold", marginRight: "6px" }}>A.</span>{q.options[0]?.replace(/^[Aa]\.\s*/, "")}
+                                </td>
+                                <td style={{ width: "50%", border: "none", padding: "2px 0px 2px 8px", fontSize: "12pt", lineHeight: "1.5", verticalAlign: "top" }}>
+                                  <span style={{ fontWeight: "bold", marginRight: "6px" }}>C.</span>{q.options[2]?.replace(/^[Cc]\.\s*/, "")}
+                                </td>
                               </tr>
                               <tr>
-                                <td style={{ width: "50%", border: "none", padding: "1px 0px", fontSize: "12pt", lineHeight: "1.5" }}>{q.options[2]}</td>
-                                <td style={{ width: "50%", border: "none", padding: "1px 0px", fontSize: "12pt", lineHeight: "1.5" }}>{q.options[3]}</td>
+                                <td style={{ width: "50%", border: "none", padding: "2px 8px 2px 0px", fontSize: "12pt", lineHeight: "1.5", verticalAlign: "top" }}>
+                                  <span style={{ fontWeight: "bold", marginRight: "6px" }}>B.</span>{q.options[1]?.replace(/^[Bb]\.\s*/, "")}
+                                </td>
+                                <td style={{ width: "50%", border: "none", padding: "2px 0px 2px 8px", fontSize: "12pt", lineHeight: "1.5", verticalAlign: "top" }}>
+                                  <span style={{ fontWeight: "bold", marginRight: "6px" }}>D.</span>{q.options[3]?.replace(/^[Dd]\.\s*/, "")}
+                                </td>
                               </tr>
                             </tbody>
                           </table>
@@ -1633,12 +1975,143 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                   </div>
                 )}
 
-                {/* BAGIAN II: ISIAN SINGKAT */}
-                {isianQuestions.length > 0 && (
-                  <div style={{ marginBottom: "25px" }}>
-                    <h4 style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", borderBottom: "1px solid #ddd", paddingBottom: "3px", marginBottom: "12px" }}>
-                      PETUNJUK B: Isilah titik-titik di bawah ini dengan jawaban yang tepat dan ringkas!
-                    </h4>
+                      {/* BAGIAN PGK */}
+                      {pgkQuestions.length > 0 && (
+                        <div style={{ marginBottom: "25px" }}>
+                          <h4 style={{ fontSize: "11pt", fontWeight: "bold", borderBottom: "1px solid #ddd", paddingBottom: "3px", marginBottom: "12px" }}>
+                            {getLetter("pgk")} Pilihan Ganda Kompleks<br/>
+                            <span style={{ fontSize: "10pt", fontWeight: "normal", fontStyle: "italic" }}>Petunjuk: Berilah tanda centang pada pernyataan yang dianggap benar (jawaban benar bisa lebih dari satu)!</span>
+                          </h4>
+                    {pgkQuestions.map((q, qIdx) => (
+                      <div key={q.number} className="question-block group relative" style={{ marginBottom: "24px", pageBreakInside: "avoid" }}>
+                        {!isExporting && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(q)}
+                            className="absolute -left-3 -top-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-all shadow-md z-10 cursor-pointer text-xs flex items-center gap-1 font-bold no-print"
+                          >
+                            <Pencil size={11} className="shrink-0" /> Edit Soal
+                          </button>
+                        )}
+                        {q.stimulusText && q.stimulusText.trim() &&
+                          !cleanForCompare(q.stimulusText).includes(cleanForCompare(q.questionText)) &&
+                          !cleanForCompare(q.questionText).includes(cleanForCompare(q.stimulusText))
+                        ? (
+                          <>
+                            <p style={{ fontSize: "12pt", margin: "0px 0px 4px 0px", lineHeight: "1.5", textAlign: "left" }}>
+                              <strong>{q.number}.</strong> {q.stimulusText}
+                            </p>
+                            <p style={{ fontSize: "12pt", margin: "0px", lineHeight: "1.5", textAlign: "left", paddingLeft: "20px" }}>
+                              {q.questionText}
+                            </p>
+                          </>
+                        ) : (
+                          <p style={{ fontSize: "12pt", margin: "0px", lineHeight: "1.5", textAlign: "left" }}>
+                            <strong>{q.number}.</strong> {q.questionText}
+                          </p>
+                        )}
+                        {renderQuestionIllustration(q, subject)}
+                        {(() => {
+                          const pgkOpts = (q.options && q.options.length > 0) ? q.options : [
+                            "Pernyataan 1 (Klik Edit untuk merubah)",
+                            "Pernyataan 2 (Klik Edit untuk merubah)",
+                            "Pernyataan 3 (Klik Edit untuk merubah)",
+                            "Pernyataan 4 (Klik Edit untuk merubah)"
+                          ];
+                          return (
+                            <div style={{ fontFamily: '"Times New Roman", Times, serif', marginLeft: "20px", marginTop: "6px" }}>
+                              {pgkOpts.map((opt, oIdx) => (
+                                <div key={oIdx} style={{ display: "flex", alignItems: "flex-start", marginBottom: "4px" }}>
+                                  <div style={{ width: "16px", height: "16px", border: "1px solid black", marginRight: "8px", marginTop: "3px" }}></div>
+                                  <div style={{ fontSize: "12pt", lineHeight: "1.5" }}>{opt.replace(/^[a-eA-E]\.\s*/, "")}</div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                      {/* BAGIAN MENJODOHKAN */}
+                      {menjodohkanQuestions.length > 0 && (
+                        <div style={{ marginBottom: "25px" }}>
+                          <h4 style={{ fontSize: "11pt", fontWeight: "bold", borderBottom: "1px solid #ddd", paddingBottom: "3px", marginBottom: "12px" }}>
+                            {getLetter("menjodohkan")} Menjodohkan<br/>
+                            <span style={{ fontSize: "10pt", fontWeight: "normal", fontStyle: "italic" }}>Petunjuk: Pasangkanlah pernyataan di sebelah kiri dengan jawaban yang tepat di sebelah kanan!</span>
+                          </h4>
+                    {menjodohkanQuestions.map((q, qIdx) => (
+                      <div key={q.number} className="question-block group relative" style={{ marginBottom: "24px", pageBreakInside: "avoid" }}>
+                        {!isExporting && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(q)}
+                            className="absolute -left-3 -top-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-all shadow-md z-10 cursor-pointer text-xs flex items-center gap-1 font-bold no-print"
+                          >
+                            <Pencil size={11} className="shrink-0" /> Edit Soal
+                          </button>
+                        )}
+                        {q.stimulusText && q.stimulusText.trim() &&
+                          !cleanForCompare(q.stimulusText).includes(cleanForCompare(q.questionText)) &&
+                          !cleanForCompare(q.questionText).includes(cleanForCompare(q.stimulusText))
+                        ? (
+                          <>
+                            <p style={{ fontSize: "12pt", margin: "0px 0px 4px 0px", lineHeight: "1.5", textAlign: "left" }}>
+                              <strong>{q.number}.</strong> {q.stimulusText}
+                            </p>
+                            <p style={{ fontSize: "12pt", margin: "0px", lineHeight: "1.5", textAlign: "left", paddingLeft: "20px" }}>
+                              {q.questionText}
+                            </p>
+                          </>
+                        ) : (
+                          <p style={{ fontSize: "12pt", margin: "0px", lineHeight: "1.5", textAlign: "left" }}>
+                            <strong>{q.number}.</strong> {q.questionText}
+                          </p>
+                        )}
+                        {renderQuestionIllustration(q, subject)}
+                        {(() => {
+                          const mPairs = (q.pairs && q.pairs.length > 0) ? q.pairs : [
+                            { question: "Pernyataan 1 (Edit soal)", answer: "Pasangan A" },
+                            { question: "Pernyataan 2 (Edit soal)", answer: "Pasangan B" },
+                            { question: "Pernyataan 3 (Edit soal)", answer: "Pasangan C" }
+                          ];
+                          // Sort answers alphabetically to naturally "shuffle" them so they don't align perfectly with questions
+                          const sortedAnswers = [...mPairs.map(p => p.answer)].sort((a, b) => a.localeCompare(b));
+                          
+                          return (
+                            <table style={{ width: "95%", margin: "10px 0 15px 15px", borderCollapse: "collapse", fontFamily: '"Times New Roman", Times, serif', border: "1px solid black" }}>
+                              <thead>
+                                <tr style={{ backgroundColor: "#f2f2f2" }}>
+                                  <th style={{ border: "1px solid black", padding: "6px", width: "45%", fontSize: "11pt", textAlign: "center" }}>Pernyataan</th>
+                                  <th style={{ border: "1px solid black", padding: "6px", width: "10%", fontSize: "11pt", textAlign: "center" }}>---</th>
+                                  <th style={{ border: "1px solid black", padding: "6px", width: "45%", fontSize: "11pt", textAlign: "center" }}>Jawaban</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {mPairs.map((pair, pIdx) => (
+                                  <tr key={pIdx}>
+                                    <td style={{ border: "1px solid black", padding: "6px 8px", fontSize: "11.5pt", verticalAlign: "middle" }}>{pIdx + 1}. {pair.question}</td>
+                                    <td style={{ border: "1px solid black", padding: "6px", textAlign: "center", fontSize: "11.5pt", verticalAlign: "middle" }}>.....</td>
+                                    <td style={{ border: "1px solid black", padding: "6px 8px", fontSize: "11.5pt", verticalAlign: "middle" }}>{String.fromCharCode(65 + pIdx)}. {sortedAnswers[pIdx] || pair.answer}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          );
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                      {/* BAGIAN ISIAN SINGKAT */}
+                      {isianQuestions.length > 0 && (
+                        <div style={{ marginBottom: "25px" }}>
+                          <h4 style={{ fontSize: "11pt", fontWeight: "bold", borderBottom: "1px solid #ddd", paddingBottom: "3px", marginBottom: "12px" }}>
+                            {getLetter("isian")} Isian Singkat<br/>
+                            <span style={{ fontSize: "10pt", fontWeight: "normal", fontStyle: "italic" }}>Petunjuk: Bacalah soal dengan teliti dan jawablah pertanyaan dengan tepat!</span>
+                          </h4>
                     {isianQuestions.map((q, qIdx) => (
                       <div key={q.number} className="question-block group relative" style={{ marginBottom: "24px", pageBreakInside: "avoid" }}>
                         {!isExporting && (
@@ -1651,29 +2124,37 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                           </button>
                         )}
 
-                        <p style={{ fontSize: "12pt", margin: "0px", lineHeight: "1.5" }}>
-                          <strong>{pgQuestions.length + qIdx + 1}.</strong> {renderStimulusText(q.stimulusText, q.questionText)}
-                          {q.questionText}
-                        </p>
+                        {/* Isian: nomor + stimulus baris 1, soal baris 2 */}
+                        {q.stimulusText && q.stimulusText.trim() &&
+                          !cleanForCompare(q.stimulusText).includes(cleanForCompare(q.questionText)) &&
+                          !cleanForCompare(q.questionText).includes(cleanForCompare(q.stimulusText))
+                        ? (
+                          <>
+                            <p style={{ fontSize: "12pt", margin: "0px 0px 4px 0px", lineHeight: "1.5", textAlign: "left" }}>
+                              <strong>{pgQuestions.length + qIdx + 1}.</strong> {q.stimulusText}
+                            </p>
+                            <p style={{ fontSize: "12pt", margin: "0px", lineHeight: "1.5", textAlign: "left", paddingLeft: "20px" }}>
+                              {q.questionText}
+                            </p>
+                          </>
+                        ) : (
+                          <p style={{ fontSize: "12pt", margin: "0px", lineHeight: "1.5", textAlign: "left" }}>
+                            <strong>{pgQuestions.length + qIdx + 1}.</strong> {q.questionText}
+                          </p>
+                        )}
                         {renderQuestionIllustration(q, subject)}
-                        <div style={{ marginTop: "6px", color: "#000000", fontSize: "12pt", marginLeft: "20px", lineHeight: "1.5" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                            <span style={{ whiteSpace: "nowrap", fontFamily: '"Times New Roman", Times, serif' }}>Jawaban:</span>
-                            <div style={{ flex: 1, borderBottom: "1px solid #000000", minHeight: "18px" }}></div>
-                          </div>
-                          <div style={{ borderBottom: "1px solid #000000", minHeight: "18px", marginBottom: "6px", width: "100%" }}></div>
-                        </div>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* BAGIAN III: URAIAN */}
-                {uraianQuestions.length > 0 && (
-                  <div style={{ marginBottom: "25px" }}>
-                    <h4 style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", borderBottom: "1px solid #ddd", paddingBottom: "3px", marginBottom: "12px" }}>
-                      PETUNJUK C: Jawablah pertanyaan-pertanyaan berikut dengan menguraikan langkah penyelesaian dan analisis Anda!
-                    </h4>
+                      {/* BAGIAN III: URAIAN */}
+                      {uraianQuestions.length > 0 && (
+                        <div style={{ marginBottom: "25px" }}>
+                          <h4 style={{ fontSize: "11pt", fontWeight: "bold", borderBottom: "1px solid #ddd", paddingBottom: "3px", marginBottom: "12px" }}>
+                            {getLetter("uraian")} Uraian<br/>
+                            <span style={{ fontSize: "10pt", fontWeight: "normal", fontStyle: "italic" }}>Petunjuk: Jawablah pertanyaan-pertanyaan berikut dengan jelas dan benar!</span>
+                          </h4>
                     {uraianQuestions.map((q, qIdx) => (
                       <div key={q.number} className="question-block group relative" style={{ marginBottom: "24px", pageBreakInside: "avoid" }}>
                         {!isExporting && (
@@ -1686,20 +2167,32 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                           </button>
                         )}
 
-                        <p style={{ fontSize: "12pt", margin: "0px", lineHeight: "1.5" }}>
-                          <strong>{pgQuestions.length + isianQuestions.length + qIdx + 1}.</strong> {renderStimulusText(q.stimulusText, q.questionText)}
-                          {q.questionText}
-                        </p>
+                        {/* Uraian: nomor + stimulus baris 1, soal baris 2 */}
+                        {q.stimulusText && q.stimulusText.trim() &&
+                          !cleanForCompare(q.stimulusText).includes(cleanForCompare(q.questionText)) &&
+                          !cleanForCompare(q.questionText).includes(cleanForCompare(q.stimulusText))
+                        ? (
+                          <>
+                            <p style={{ fontSize: "12pt", margin: "0px 0px 4px 0px", lineHeight: "1.5", textAlign: "left" }}>
+                              <strong>{pgQuestions.length + isianQuestions.length + qIdx + 1}.</strong> {q.stimulusText}
+                            </p>
+                            <p style={{ fontSize: "12pt", margin: "0px", lineHeight: "1.5", textAlign: "left", paddingLeft: "20px" }}>
+                              {q.questionText}
+                            </p>
+                          </>
+                        ) : (
+                          <p style={{ fontSize: "12pt", margin: "0px", lineHeight: "1.5", textAlign: "left" }}>
+                            <strong>{pgQuestions.length + isianQuestions.length + qIdx + 1}.</strong> {q.questionText}
+                          </p>
+                        )}
                         {renderQuestionIllustration(q, subject)}
-                        <div style={{ marginTop: "8px", color: "#000000", fontSize: "12pt", marginLeft: "20px", lineHeight: "1.5" }}>
-                          <div style={{ borderBottom: "1px solid #000000", minHeight: "22px", marginBottom: "10px", width: "100%" }}></div>
-                          <div style={{ borderBottom: "1px solid #000000", minHeight: "22px", marginBottom: "10px", width: "100%" }}></div>
-                          <div style={{ borderBottom: "1px solid #000000", minHeight: "22px", marginBottom: "10px", width: "100%" }}></div>
-                        </div>
                       </div>
                     ))}
                   </div>
                 )}
+                    </>
+                  );
+                })()}
               </div>
             )}
 
@@ -1713,39 +2206,39 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                       <tr style={{ border: "none" }}>
                         {/* Sisi Kiri: Logo Kabupaten */}
                         {hasLeft && (
-                          <td style={{ border: "none", width: leftWidth, textAlign: "center", verticalAlign: "middle", paddingRight: "10px" }}>
+                          <td style={{ border: "none", width: leftWidth, textAlign: "center", verticalAlign: "top", paddingRight: "8px" }}>
                             <img 
                               src={leftLogo!} 
                               alt="Logo Kabupaten" 
-                              style={{ height: "75px", width: "75px", display: "inline-block", objectFit: "contain" }} 
+                              style={{ height: `${logo1Size.h}px`, width: `${logo1Size.w}px`, display: "inline-block", objectFit: "fill" }} 
                               referrerPolicy="no-referrer"
                             />
                           </td>
                         )}
                         
                         {/* Tengah: Identitas Lembaga */}
-                        <td style={{ border: "none", width: centerWidth, textAlign: "center", verticalAlign: "middle" }}>
-                          <p className="kop-b1" style={{ margin: "0px", fontSize: "14pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
+                        <td style={{ border: "none", width: centerWidth, textAlign: "center", verticalAlign: "top" }}>
+                          <p className="kop-b1" style={{ margin: "0px", fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: "1.2", whiteSpace: "nowrap" }}>
                             {schoolInfo.governmentName || "Pemerintah Kabupaten / Kota"}
                           </p>
-                          <p className="kop-b2" style={{ margin: "2px 0px", fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
+                          <p className="kop-b2" style={{ margin: "1px 0px", fontSize: "10.5pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
                             {schoolInfo.educationDepartment || "Dinas Pendidikan dan Kebudayaan"}
                           </p>
-                          <p className="kop-b3" style={{ margin: "2px 0px", fontSize: "15pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
+                          <p className="kop-b3" style={{ margin: "1px 0px", fontSize: "14pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
                             {schoolInfo.schoolName || "SD NEGERI KABUPATEN"}
                           </p>
-                          <p className="kop-b4" style={{ margin: "2px 0px 0px 0px", fontSize: "9.5pt", fontStyle: "italic", lineHeight: "1.2", fontWeight: "normal" }}>
+                          <p className="kop-b4" style={{ margin: "2px 0px 0px 0px", fontSize: "9pt", fontStyle: "italic", lineHeight: "1.2", fontWeight: "normal" }}>
                             Alamat: {schoolInfo.schoolAddress || "Alamat Lengkap Lembaga Pendidikan"}
                           </p>
                         </td>
 
                         {/* Sisi Kanan: Logo Sekolah */}
                         {hasRight && (
-                          <td style={{ border: "none", width: rightWidth, textAlign: "center", verticalAlign: "middle", paddingLeft: "10px" }}>
+                          <td style={{ border: "none", width: rightWidth, textAlign: "center", verticalAlign: "top", paddingLeft: "8px" }}>
                             <img 
                               src={rightLogo!} 
                               alt="Logo Sekolah" 
-                              style={{ height: "75px", width: "75px", display: "inline-block", objectFit: "contain" }} 
+                              style={{ height: `${logo2Size.h}px`, width: `${logo2Size.w}px`, display: "inline-block", objectFit: "fill" }} 
                               referrerPolicy="no-referrer"
                             />
                           </td>
@@ -1782,6 +2275,8 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                 <div style={{ marginTop: "15px", marginBottom: "30px", color: "#000000" }}>
                   {(() => {
                     const pgQuestions = questions.filter(q => q.questionType === "Pilihan Ganda");
+                    const pgkQuestions = questions.filter(q => q.questionType === "Pilihan Ganda Kompleks");
+                    const menjodohkanQuestions = questions.filter(q => q.questionType === "Menjodohkan");
                     const isianQuestions = questions.filter(q => q.questionType === "Isian Singkat");
                     const uraianQuestions = questions.filter(q => q.questionType === "Uraian");
 
@@ -1801,6 +2296,69 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                                   <span style={{ textTransform: "uppercase", fontWeight: "900", color: "#000000", fontSize: "12.5pt" }}>{q.answerKey.trim().toUpperCase()}</span>
                                 </div>
                               ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pilihan Ganda Kompleks */}
+                        {pgkQuestions.length > 0 && (
+                          <div style={{ marginBottom: "30px" }}>
+                            <h4 style={{ fontSize: "12pt", fontWeight: "bold", borderBottom: "1.5px solid #000000", paddingBottom: "3px", marginBottom: "15px", textTransform: "uppercase", color: "#000000" }}>
+                              Kunci Jawaban Soal Pilihan Ganda Kompleks (PGK)
+                            </h4>
+                            <div className="space-y-4" style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: "11pt" }}>
+                              {pgkQuestions.map((q) => {
+                                const correctKeys = q.answerKey.toUpperCase().split(/[,;]/).map(k => k.trim());
+                                return (
+                                  <div key={q.number} style={{ padding: "12px", border: "1px solid #000000", backgroundColor: "#ffffff" }}>
+                                    <div style={{ fontWeight: "bold", marginBottom: "8px", color: "#000000" }}>Soal Nomor {q.number} (PGK)</div>
+                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                      <tbody>
+                                        {(q.options || []).map((opt, oIdx) => {
+                                          const letter = String.fromCharCode(65 + oIdx);
+                                          const isCorrect = correctKeys.includes(letter);
+                                          return (
+                                            <tr key={oIdx}>
+                                              <td style={{ width: "40px", padding: "4px", verticalAlign: "top", textAlign: "center" }}>
+                                                <div style={{ width: "16px", height: "16px", border: "1px solid black", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold" }}>
+                                                  {isCorrect ? "✓" : ""}
+                                                </div>
+                                              </td>
+                                              <td style={{ padding: "4px", verticalAlign: "top" }}>{opt}</td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Menjodohkan */}
+                        {menjodohkanQuestions.length > 0 && (
+                          <div style={{ marginBottom: "30px" }}>
+                            <h4 style={{ fontSize: "12pt", fontWeight: "bold", borderBottom: "1.5px solid #000000", paddingBottom: "3px", marginBottom: "15px", textTransform: "uppercase", color: "#000000" }}>
+                              Kunci Jawaban Soal Menjodohkan
+                            </h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: "11pt", color: "#000000" }}>
+                              {menjodohkanQuestions.map((q) => {
+                                const sortedAnswers = [...(q.pairs || []).map(p => p.answer)].sort((a, b) => a.localeCompare(b));
+                                const pairsString = (q.pairs || []).map((p, pIdx) => {
+                                  const actualAnswerIdx = sortedAnswers.indexOf(p.answer);
+                                  const answerLetter = String.fromCharCode(65 + (actualAnswerIdx !== -1 ? actualAnswerIdx : pIdx));
+                                  return `${pIdx + 1} = ${answerLetter}`;
+                                }).join(", ");
+
+                                return (
+                                  <div key={q.number} style={{ padding: "8px 12px", border: "1.5px solid #000000", borderRadius: "6px", backgroundColor: "#ffffff", textAlign: "left" }}>
+                                    <span style={{ fontWeight: "bold", color: "#000000", display: "block", marginBottom: "4px" }}>Nomor {q.number}:</span>
+                                    <span style={{ fontWeight: "900", color: "#000000", fontSize: "12pt" }}>{pairsString}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
@@ -1919,11 +2477,11 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                       <tr style={{ border: "none" }}>
                         {/* Sisi Kiri: Logo Kabupaten */}
                         {hasLeft && (
-                          <td style={{ border: "none", width: leftWidth, textAlign: "center", verticalAlign: "middle", paddingRight: "10px" }}>
+                          <td style={{ border: "none", width: leftWidth, textAlign: "center", verticalAlign: "middle", paddingRight: "8px" }}>
                             <img 
                               src={leftLogo!} 
                               alt="Logo Kabupaten" 
-                              style={{ height: "75px", width: "75px", display: "inline-block", objectFit: "contain" }} 
+                              style={{ height: `${logo1Size.h}px`, width: `${logo1Size.w}px`, display: "inline-block", objectFit: "fill" }} 
                               referrerPolicy="no-referrer"
                             />
                           </td>
@@ -1931,27 +2489,27 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                         
                         {/* Tengah: Identitas Lembaga */}
                         <td style={{ border: "none", width: centerWidth, textAlign: "center", verticalAlign: "middle" }}>
-                          <p className="kop-b1" style={{ margin: "0px", fontSize: "14pt", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: "1.2" }}>
+                          <p className="kop-b1" style={{ margin: "0px", fontSize: "13pt", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: "1.2", whiteSpace: "nowrap" }}>
                             {schoolInfo.governmentName || "Pemerintah Kabupaten / Kota"}
                           </p>
-                          <p className="kop-b2" style={{ margin: "2px 0px", fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
+                          <p className="kop-b2" style={{ margin: "1px 0px", fontSize: "10.5pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
                             {schoolInfo.educationDepartment || "Dinas Pendidikan dan Kebudayaan"}
                           </p>
-                          <p className="kop-b3" style={{ margin: "2px 0px", fontSize: "15pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
+                          <p className="kop-b3" style={{ margin: "1px 0px", fontSize: "14pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2" }}>
                             {schoolInfo.schoolName || "SD NEGERI KABUPATEN"}
                           </p>
-                          <p className="kop-b4" style={{ margin: "2px 0px 0px 0px", fontSize: "9.5pt", fontStyle: "italic", lineHeight: "1.2", fontWeight: "normal" }}>
+                          <p className="kop-b4" style={{ margin: "2px 0px 0px 0px", fontSize: "9pt", fontStyle: "italic", lineHeight: "1.2", fontWeight: "normal" }}>
                             Alamat: {schoolInfo.schoolAddress || "Alamat Lengkap Lembaga Pendidikan"}
                           </p>
                         </td>
 
                         {/* Sisi Kanan: Logo Sekolah */}
                         {hasRight && (
-                          <td style={{ border: "none", width: rightWidth, textAlign: "center", verticalAlign: "middle", paddingLeft: "10px" }}>
+                          <td style={{ border: "none", width: rightWidth, textAlign: "center", verticalAlign: "middle", paddingLeft: "8px" }}>
                             <img 
                               src={rightLogo!} 
                               alt="Logo Sekolah" 
-                              style={{ height: "75px", width: "75px", display: "inline-block", objectFit: "contain" }} 
+                              style={{ height: `${logo2Size.h}px`, width: `${logo2Size.w}px`, display: "inline-block", objectFit: "fill" }} 
                               referrerPolicy="no-referrer"
                             />
                           </td>

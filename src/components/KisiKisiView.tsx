@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { SchoolInfo, KisiKisiRow } from "../types";
 import { FileDown, Printer, FileText, CheckCircle2 } from "lucide-react";
 import PremiumLoader from "./PremiumLoader";
@@ -26,10 +26,12 @@ const formatAnswerKey = (answerKey: string, questionType: string, index: number)
   const cleanKey = (answerKey || "").trim();
   
   if (cleanType === "pilihan ganda") {
-    // If it contains multiple choices or ranges, select from deterministic index range for absolute safety
+    const letters = ["A", "B", "C", "D"];
+    // Pseudo-random but stable fallback based on index if answer string doesn't provide a clear letter
+    const fallbackRandomLetter = letters[Math.floor(Math.abs(Math.sin(index * 999.99)) * 4)];
+    
     if (cleanKey.toLowerCase().includes("atau") || cleanKey.toLowerCase().includes("/") || cleanKey.toLowerCase().includes(",")) {
-      const letters = ["A", "B", "C", "D"];
-      return letters[index % 4];
+      return fallbackRandomLetter;
     }
     const match = cleanKey.match(/^[a-dA-D](?:\b|[.\s\)]|$)/);
     if (match) {
@@ -39,10 +41,11 @@ const formatAnswerKey = (answerKey: string, questionType: string, index: number)
     if (generalMatch) {
       return generalMatch[1].toUpperCase();
     }
-    const letters = ["A", "B", "C", "D"];
-    return letters[index % 4];
+    return fallbackRandomLetter;
   }
-  return cleanKey;
+  
+  // For all other types (PGK, Menjodohkan, Isian, Uraian), display this explicit message on the Kisi-Kisi sheet
+  return "Tersedia pada lembar kunci jawaban";
 };
 
 // Helper to convert oklab to rgb/rgba format
@@ -335,6 +338,37 @@ export default function KisiKisiView({
   const [isFullScreen, setIsFullScreen] = useState(false);
   const printAreaRef = useRef<HTMLDivElement>(null);
 
+  // Flexible logo size state — synced globally with localStorage so Soal Ujian matches Kisi-Kisi
+  const [logo1Size, setLogo1Size] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ttu_logo1_size");
+      const parsed = saved ? JSON.parse(saved) : null;
+      return (parsed && typeof parsed === 'object' && 'w' in parsed && 'h' in parsed) ? parsed : { w: 58, h: 68 };
+    } catch (e) {
+      return { w: 58, h: 68 };
+    }
+  });
+  const [logo2Size, setLogo2Size] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ttu_logo2_size");
+      const parsed = saved ? JSON.parse(saved) : null;
+      return (parsed && typeof parsed === 'object' && 'w' in parsed && 'h' in parsed) ? parsed : { w: 130, h: 82 };
+    } catch (e) {
+      return { w: 130, h: 82 };
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("ttu_logo1_size", JSON.stringify(logo1Size));
+    // Trigger custom event for real-time sync with other mounted views
+    window.dispatchEvent(new Event("logoSizeChanged"));
+  }, [logo1Size]);
+
+  useEffect(() => {
+    localStorage.setItem("ttu_logo2_size", JSON.stringify(logo2Size));
+    window.dispatchEvent(new Event("logoSizeChanged"));
+  }, [logo2Size]);
+
   const leftLogo = getLogoKabupatenUrl(schoolInfo);
   const rightLogo = getLogoSekolahUrl(schoolInfo);
   const hasLeft = !!leftLogo;
@@ -345,15 +379,15 @@ export default function KisiKisiView({
   let rightWidth = "0%";
 
   if (hasLeft && hasRight) {
-    leftWidth = "12%";
-    centerWidth = "76%";
-    rightWidth = "12%";
+    leftWidth = "15%";
+    centerWidth = "70%";
+    rightWidth = "15%";
   } else if (hasLeft) {
-    leftWidth = "12%";
-    centerWidth = "88%";
+    leftWidth = "15%";
+    centerWidth = "85%";
   } else if (hasRight) {
-    centerWidth = "88%";
-    rightWidth = "12%";
+    centerWidth = "85%";
+    rightWidth = "15%";
   }
 
   // Return formatted current date e.g. "Kefamenanu, 21 Mei 2026"
@@ -408,6 +442,8 @@ export default function KisiKisiView({
             font-size: 12pt;
             line-height: 1.5;
             font-family: "Times New Roman", "serif";
+            text-align: justify;
+            text-justify: inter-word;
           }
           table {
             border-collapse: collapse;
@@ -420,6 +456,7 @@ export default function KisiKisiView({
             border: 1px solid black;
             padding: 5px;
             vertical-align: top;
+            text-align: justify;
           }
           th {
             background-color: #f2f2f2;
@@ -524,6 +561,25 @@ export default function KisiKisiView({
     const clonedElement = contentsElement.cloneNode(true) as HTMLElement;
     clonedElement.querySelectorAll('button, .no-print, [data-no-export], .no-export, svg').forEach(el => el.remove());
 
+    // Force standard Times New Roman, line-height 1.5, and text-align justify inline style properties on all cloned elements
+    clonedElement.querySelectorAll('*').forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      htmlEl.style.fontFamily = '"Times New Roman", Times, serif';
+      htmlEl.style.lineHeight = '1.5';
+      htmlEl.style.color = '#000000';
+      
+      const tagName = htmlEl.tagName.toLowerCase();
+      if (tagName === 'p' || tagName === 'li' || tagName === 'td') {
+        if (htmlEl.style.textAlign !== 'center' && htmlEl.style.textAlign !== 'right') {
+          htmlEl.style.textAlign = 'justify';
+        }
+      }
+      if (tagName === 'p') {
+        htmlEl.style.marginTop = '0px';
+        htmlEl.style.marginBottom = '6px';
+      }
+    });
+
     let bodyContent = clonedElement.innerHTML;
     try {
       bodyContent = await convertImagesToBase64(bodyContent);
@@ -549,24 +605,71 @@ export default function KisiKisiView({
   const handleDownloadPdf = async () => {
     if (!printAreaRef.current) return;
     setDownloadingPdf(true);
-    // Smooth delay to appreciate premium circular progress rendering
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 800));
     try {
-      const html2pdf = await getHtml2Pdf();
-      const filename = `Kisi_Kisi_${subject.replace(/\s+/g, "_")}_${schoolInfo.gradeClass.replace(/\s+/g, "_")}.pdf`;
-      const opt = {
-        margin: 10, // margins on all sides (mm)
-        filename: filename,
-        image: { type: "jpeg" as const, quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "landscape" as const }
-      };
-      
-      await withPdfStylesPatch(async () => {
-        await html2pdf().set(opt).from(printAreaRef.current).save();
-      });
+      const printStyleId = "pelita-kisi-print-style";
+      let printStyle = document.getElementById(printStyleId) as HTMLStyleElement | null;
+      if (!printStyle) {
+        printStyle = document.createElement("style");
+        printStyle.id = printStyleId;
+        document.head.appendChild(printStyle);
+      }
+
+      printStyle.innerHTML = `
+        @media print {
+          @page {
+            size: A4 landscape;
+            margin: 15mm 15mm 15mm 15mm;
+          }
+          body > * { display: none !important; }
+          #kisi-kisi-print-area,
+          #kisi-kisi-print-area * {
+            display: revert !important;
+            visibility: visible !important;
+          }
+          #kisi-kisi-print-area {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            background: white !important;
+            font-family: "Times New Roman", Times, serif !important;
+            font-size: 10pt !important;
+            line-height: 1.5 !important;
+            color: #000000 !important;
+          }
+          button, .no-print, [data-no-export], .no-export, nav, header, aside {
+            display: none !important;
+          }
+          /* Rata kiri untuk isi dokumen */
+          p, div, td, li { 
+            text-align: left !important;
+          }
+          /* Rata tengah khusus KOP dan judul */
+          .kop, .kop *, .document-title, th, .text-center {
+            text-align: center !important;
+          }
+          table { page-break-inside: auto; }
+          tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `;
+
+      window.print();
+
+      setTimeout(() => {
+        printStyle!.innerHTML = "";
+      }, 2000);
+
     } catch (err: any) {
-      console.error("Gagal mendownload PDF:", err);
+      console.error("Gagal mencetak PDF Kisi-Kisi:", err);
     } finally {
       setDownloadingPdf(false);
     }
@@ -602,6 +705,40 @@ export default function KisiKisiView({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end relative z-10">
+
+          {/* === KONTROL UKURAN LOGO (no-print) === */}
+          {(hasLeft || hasRight) && (
+            <div className="no-print flex flex-wrap items-center gap-2 bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">🖼️ Ukuran Logo</span>
+              {hasLeft && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-blue-300 font-semibold">Logo 1:</span>
+                  <button type="button" onClick={() => setLogo1Size(s => ({ ...s, w: Math.max(30, s.w - 4) }))} className="w-5 h-5 rounded bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold flex items-center justify-center cursor-pointer">−</button>
+                  <span className="text-[10px] text-slate-300 w-8 text-center">{logo1Size.w}px</span>
+                  <button type="button" onClick={() => setLogo1Size(s => ({ ...s, w: Math.min(400, s.w + 4) }))} className="w-5 h-5 rounded bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold flex items-center justify-center cursor-pointer">+</button>
+                  <span className="text-[10px] text-slate-500 mx-1">×</span>
+                  <button type="button" onClick={() => setLogo1Size(s => ({ ...s, h: Math.max(30, s.h - 4) }))} className="w-5 h-5 rounded bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold flex items-center justify-center cursor-pointer">−</button>
+                  <span className="text-[10px] text-slate-300 w-8 text-center">{logo1Size.h}px</span>
+                  <button type="button" onClick={() => setLogo1Size(s => ({ ...s, h: Math.min(400, s.h + 4) }))} className="w-5 h-5 rounded bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold flex items-center justify-center cursor-pointer">+</button>
+                </div>
+              )}
+              {hasLeft && hasRight && <div className="w-px h-5 bg-slate-600" />}
+              {hasRight && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-amber-300 font-semibold">Logo 2:</span>
+                  <button type="button" onClick={() => setLogo2Size(s => ({ ...s, w: Math.max(30, s.w - 4) }))} className="w-5 h-5 rounded bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold flex items-center justify-center cursor-pointer">−</button>
+                  <span className="text-[10px] text-slate-300 w-8 text-center">{logo2Size.w}px</span>
+                  <button type="button" onClick={() => setLogo2Size(s => ({ ...s, w: Math.min(400, s.w + 4) }))} className="w-5 h-5 rounded bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold flex items-center justify-center cursor-pointer">+</button>
+                  <span className="text-[10px] text-slate-500 mx-1">×</span>
+                  <button type="button" onClick={() => setLogo2Size(s => ({ ...s, h: Math.max(30, s.h - 4) }))} className="w-5 h-5 rounded bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold flex items-center justify-center cursor-pointer">−</button>
+                  <span className="text-[10px] text-slate-300 w-8 text-center">{logo2Size.h}px</span>
+                  <button type="button" onClick={() => setLogo2Size(s => ({ ...s, h: Math.min(400, s.h + 4) }))} className="w-5 h-5 rounded bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold flex items-center justify-center cursor-pointer">+</button>
+                </div>
+              )}
+              <button type="button" onClick={() => { setLogo1Size({ w: 58, h: 68 }); setLogo2Size({ w: 130, h: 82 }); }} className="text-[9px] text-slate-400 hover:text-white bg-slate-700 hover:bg-slate-600 px-2 py-0.5 rounded cursor-pointer transition-colors">Reset</button>
+            </div>
+          )}
+
           <button
             id="btn-preview-kisi-fullscreen"
             type="button"
@@ -694,10 +831,39 @@ export default function KisiKisiView({
             ? "min-w-[1000px] w-full max-w-[1150px] bg-white p-8 md:p-12 shadow-2xl rounded-b-2xl border-x border-b border-slate-350 text-black mb-8"
             : "min-w-[1000px] bg-white p-10 md:p-12"
           }
-          style={{ fontFamily: '"Times New Roman", Times, serif', color: "#000000", backgroundColor: "#ffffff" }}
+          style={{ fontFamily: '"Times New Roman", Times, serif', color: "#000000", backgroundColor: "#ffffff", textAlign: "left" }}
         >
           {/* Wrapper payload yang di-generate untuk Word agar style mso-page tersemat */}
           <div id="kisi-kisi-doc-payload" style={{ color: "#000000", backgroundColor: "#ffffff" }}>
+            <style dangerouslySetInnerHTML={{ __html: `
+              /* PDF Generation Mode styles to ensure high quality A4 landscape print layout */
+              .pdf-export-mode-kisi {
+                width: 1050px !important;
+                max-width: 1050px !important;
+                min-width: 1050px !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                background-color: #ffffff !important;
+                color: #000000 !important;
+              }
+              .pdf-export-mode-kisi p, .pdf-export-mode-kisi div, .pdf-export-mode-kisi td, .pdf-export-mode-kisi span {
+                text-align: left !important;
+                font-family: "Times New Roman", Times, serif !important;
+                line-height: 1.5 !important;
+                color: #000000 !important;
+              }
+              .pdf-export-mode-kisi .kop, 
+              .pdf-export-mode-kisi .kop *, 
+              .pdf-export-mode-kisi .document-title, 
+              .pdf-export-mode-kisi .signature-table td, 
+              .pdf-export-mode-kisi th,
+              .pdf-export-mode-kisi .text-center,
+              .pdf-export-mode-kisi [style*="text-align: center"] {
+                text-align: center !important;
+              }
+            `}} />
             {/* Kop Resmi Dinamis */}
             <div className="kop" style={{ borderBottom: "3px double #000000", paddingBottom: "10px", marginBottom: "15px", color: "#000000" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", border: "none", color: "#000000" }}>
@@ -705,39 +871,39 @@ export default function KisiKisiView({
                   <tr style={{ border: "none" }}>
                     {/* Sisi Kiri: Logo Kabupaten */}
                     {hasLeft && (
-                      <td style={{ border: "none", width: leftWidth, textAlign: "center", verticalAlign: "middle", paddingRight: "10px" }}>
+                      <td style={{ border: "none", width: leftWidth, textAlign: "center", verticalAlign: "top", paddingRight: "8px" }}>
                         <img 
                           src={leftLogo!} 
                           alt="Logo Kabupaten" 
-                          style={{ maxHeight: "75px", maxWidth: "75px", display: "inline-block", objectFit: "contain" }} 
+                          style={{ height: `${logo1Size.h}px`, width: `${logo1Size.w}px`, display: "inline-block", objectFit: "fill" }} 
                           referrerPolicy="no-referrer"
                         />
                       </td>
                     )}
                     
                     {/* Tengah: Identitas Lembaga */}
-                    <td style={{ border: "none", width: centerWidth, textAlign: "center", verticalAlign: "middle", color: "#000000" }}>
-                      <p className="kop-b1" style={{ margin: "0px", fontSize: "14pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2", color: "#000000" }}>
+                    <td style={{ border: "none", width: centerWidth, textAlign: "center", verticalAlign: "top", color: "#000000" }}>
+                      <p className="kop-b1" style={{ margin: "0px", fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: "1.2", color: "#000000", whiteSpace: "nowrap" }}>
                         {schoolInfo.governmentName || "Pemerintah Kabupaten / Kota"}
                       </p>
-                      <p className="kop-b2" style={{ margin: "2px 0px", fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2", color: "#000000" }}>
+                      <p className="kop-b2" style={{ margin: "1px 0px", fontSize: "10.5pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2", color: "#000000" }}>
                         {schoolInfo.educationDepartment || "Dinas Pendidikan dan Kebudayaan"}
                       </p>
-                      <p className="kop-b3" style={{ margin: "2px 0px", fontSize: "14pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2", color: "#000000" }}>
+                      <p className="kop-b3" style={{ margin: "1px 0px", fontSize: "14pt", fontWeight: "bold", textTransform: "uppercase", lineHeight: "1.2", color: "#000000" }}>
                         {schoolInfo.schoolName || "SD NEGERI KABUPATEN"}
                       </p>
-                      <p className="kop-b4" style={{ margin: "2px 0px 0px 0px", fontSize: "9.5pt", fontStyle: "italic", lineHeight: "1.2", fontWeight: "normal", color: "#000000" }}>
+                      <p className="kop-b4" style={{ margin: "2px 0px 0px 0px", fontSize: "9pt", fontStyle: "italic", lineHeight: "1.2", fontWeight: "normal", color: "#000000" }}>
                         Alamat: {schoolInfo.schoolAddress || "Alamat Lengkap Lembaga Pendidikan"}
                       </p>
                     </td>
 
                     {/* Sisi Kanan: Logo Sekolah */}
                     {hasRight && (
-                      <td style={{ border: "none", width: rightWidth, textAlign: "center", verticalAlign: "middle", paddingLeft: "10px" }}>
+                      <td style={{ border: "none", width: rightWidth, textAlign: "center", verticalAlign: "top", paddingLeft: "8px" }}>
                         <img 
                           src={rightLogo!} 
                           alt="Logo Sekolah" 
-                          style={{ maxHeight: "75px", maxWidth: "75px", display: "inline-block", objectFit: "contain" }} 
+                          style={{ height: `${logo2Size.h}px`, width: `${logo2Size.w}px`, display: "inline-block", objectFit: "fill" }} 
                           referrerPolicy="no-referrer"
                         />
                       </td>
@@ -755,17 +921,17 @@ export default function KisiKisiView({
             {/* Meta Data Sekolah */}
             <table className="meta-table" style={{ border: "none", width: "100%", marginBottom: "12px", borderCollapse: "collapse", color: "#000000", fontFamily: '"Times New Roman", Times, serif', lineHeight: "1.5" }}>
               <tbody>
-                <tr style={{ border: "none" }}>
-                  <td style={{ border: "none", padding: "2px 0px", width: "15%", fontSize: "12pt", fontWeight: "bold", color: "#000000" }}>
-                    <span style={{ backgroundColor: "#d9eafd", padding: "2px 6px", borderRadius: "4px" }}>Mata Pelajaran</span>
+                <tr style={{ border: "none", backgroundColor: "#0070c0", color: "#000000" }}>
+                  <td style={{ border: "none", padding: "4px 8px", width: "15%", fontSize: "12pt", fontWeight: "bold", color: "#000000" }}>
+                    Mata Pelajaran
                   </td>
-                  <td style={{ border: "none", padding: "2px 0px", width: "2%", fontSize: "12pt", color: "#000000" }}>:</td>
-                  <td style={{ border: "none", padding: "2px 0px", width: "33%", fontSize: "12pt", color: "#000000" }}>{subject}</td>
-                  <td style={{ border: "none", padding: "2px 0px", width: "15%", fontSize: "12pt", fontWeight: "bold", color: "#000000" }}>
-                    <span style={{ backgroundColor: "#d9eafd", padding: "2px 6px", borderRadius: "4px" }}>Kelas / Semester</span>
+                  <td style={{ border: "none", padding: "4px 8px", width: "2%", fontSize: "12pt", color: "#000000" }}>:</td>
+                  <td style={{ border: "none", padding: "4px 8px", width: "33%", fontSize: "12pt", color: "#000000", fontWeight: "bold" }}>{subject}</td>
+                  <td style={{ border: "none", padding: "4px 8px", width: "15%", fontSize: "12pt", fontWeight: "bold", color: "#000000" }}>
+                    Kelas / Semester
                   </td>
-                  <td style={{ border: "none", padding: "2px 0px", width: "2%", fontSize: "12pt", color: "#000000" }}>:</td>
-                  <td style={{ border: "none", padding: "2px 0px", width: "33%", fontSize: "12pt", color: "#000000" }}>{schoolInfo.gradeClass} / Semester {schoolInfo.semester || 'I'}</td>
+                  <td style={{ border: "none", padding: "4px 8px", width: "2%", fontSize: "12pt", color: "#000000" }}>:</td>
+                  <td style={{ border: "none", padding: "4px 8px", width: "33%", fontSize: "12pt", color: "#000000", fontWeight: "bold" }}>{schoolInfo.gradeClass} / Semester {schoolInfo.semester || 'I'}</td>
                 </tr>
                 <tr style={{ border: "none" }}>
                   <td style={{ border: "none", padding: "2px 0px", fontSize: "12pt", fontWeight: "bold", color: "#000000" }}>Satuan Pendidikan</td>
@@ -796,10 +962,10 @@ export default function KisiKisiView({
                 {kisiKisi.map((row, idx) => (
                   <tr key={idx} style={{ pageBreakInside: "avoid" }}>
                     <td style={{ border: "1.8px solid #000000", padding: "8px 6px", textAlign: "center", color: "#000000", fontWeight: "bold", fontSize: "12pt" }}>{row.number || idx + 1}</td>
-                    <td style={{ border: "1.8px solid #000000", padding: "8px 6px", fontSize: "12pt", fontWeight: "500", lineHeight: "1.5", color: "#000000" }}>{row.cp}</td>
+                    <td style={{ border: "1.8px solid #000000", padding: "8px 6px", fontSize: "12pt", fontWeight: "500", lineHeight: "1.5", color: "#000000", textAlign: "left" }}>{row.cp}</td>
                     <td style={{ border: "1.8px solid #000000", padding: "8px 6px", fontSize: "12pt", fontWeight: "bold", color: "#000000" }}>{row.element}</td>
                     <td style={{ border: "1.8px solid #000000", padding: "8px 6px", fontSize: "12pt", fontWeight: "500", color: "#000000" }}>{row.materi}</td>
-                    <td style={{ border: "1.8px solid #000000", padding: "8px 6px", fontSize: "12pt", fontWeight: "500", lineHeight: "1.5", color: "#000000" }}>
+                    <td style={{ border: "1.8px solid #000000", padding: "8px 6px", fontSize: "12pt", fontWeight: "500", lineHeight: "1.5", color: "#000000", textAlign: "left" }}>
                       {row.indicator}
                     </td>
                     <td style={{ border: "1.8px solid #000000", padding: "8px 6px", fontSize: "12pt", textAlign: "center", color: "#000000" }}>{row.cognitiveLevel}</td>

@@ -48,7 +48,7 @@ export interface AIElementTopic {
 }
 
 export interface QuestionConfig {
-  type: "Pilihan Ganda" | "Isian Singkat" | "Uraian";
+  type: "Pilihan Ganda" | "Pilihan Ganda Kompleks" | "Menjodohkan" | "Isian Singkat" | "Uraian";
   count: number;
   cognitiveLevel: "Level 1" | "Level 2" | "Level 3";
 }
@@ -66,13 +66,14 @@ export interface KisiKisiRow {
 
 export interface QuestionItem {
   number: number;
-  questionType: "Pilihan Ganda" | "Isian Singkat" | "Uraian";
+  questionType: "Pilihan Ganda" | "Pilihan Ganda Kompleks" | "Menjodohkan" | "Isian Singkat" | "Uraian";
   cognitiveLevel: string;
   materi: string;
   stimulusText?: string;
   questionText: string;
-  options?: string[];
-  answerKey: string;
+  options?: string[]; // Used for PG and PGK
+  pairs?: { question: string; answer: string }[]; // Used for Menjodohkan
+  answerKey: string; // Used for all, for PGK it might be comma separated, for Menjodohkan might be formatted string
   explanation: string;
   imageUrl?: string;
   svgContent?: string;
