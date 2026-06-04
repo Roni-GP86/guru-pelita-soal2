@@ -998,7 +998,14 @@ export async function apiGenerateSoal(
                 `Pernyataan 4 tentang ${q.materi || 'materi ini'}`
               ];
             }
-            return { ...q, imagePrompt: promptStr, imagenPrompt: promptStr, materi: cleanMateri(q.materi || "") };
+            // Validate and normalize PGK answer key
+            let pgkKey = (q.answerKey || "").trim();
+            if (!pgkKey || !pgkKey.includes(",")) {
+              const allOpts = ["A", "B", "C", "D"];
+              const shuffledPGK = [...allOpts].sort(() => Math.random() - 0.5);
+              pgkKey = `${shuffledPGK[0]}, ${shuffledPGK[1]}`;
+            }
+            return { ...q, answerKey: pgkKey, imagePrompt: "", imagenPrompt: "", imageUrl: "", svgContent: "", materi: cleanMateri(q.materi || "") };
           }
 
           if (q.questionType === "Menjodohkan") {
@@ -1009,7 +1016,10 @@ export async function apiGenerateSoal(
                 { question: `Konsep C (${q.materi || 'Materi'})`, answer: "Pasangan C" }
               ];
             }
-            return { ...q, imagePrompt: promptStr, imagenPrompt: promptStr, materi: cleanMateri(q.materi || "") };
+            if (!q.questionText || !q.questionText.toLowerCase().includes("jodoh")) {
+              q.questionText = "Jodohkanlah pernyataan di kolom kiri dengan jawaban yang tepat di kolom kanan!";
+            }
+            return { ...q, options: [], answerKey: "Lihat pairs", imagePrompt: "", imagenPrompt: "", imageUrl: "", svgContent: "", materi: cleanMateri(q.materi || "") };
           }
 
           if (q.questionType !== "Pilihan Ganda") {

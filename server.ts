@@ -1367,7 +1367,7 @@ app.post("/api/generate-topics", async (req, res) => {
     `;
 
     const response = await generateContentWithRetry(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         systemInstruction: "Anda adalah pengembang kurikulum nasional SD di Indonesia yang ahli dalam menyusun Capaian Pembelajaran Kurikulum Merdeka yang rincian materi bahasan yang sangat mendasar dan konkrit.",
@@ -1703,7 +1703,7 @@ app.post("/api/generate-kisi-kisi", async (req, res) => {
     `;
 
     const response = await generateContentWithRetry(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         systemInstruction: systemInstructionOverride + "\n\nAnda menyusun matriks kisi-kisi ujian yang sangat detail namun sederhana, menyertakan stimulus (contoh konkrit, cerita, deskripsi gambar, puisi, pantun atau dialog) yang pendek, ringkas dan ramah anak pada indikator soal, serta mematuhi Level Kognitif secara akurat.",
@@ -1980,7 +1980,7 @@ app.post("/api/generate-soal", async (req, res) => {
     `;
 
     const response = await generateContentWithRetry(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         systemInstruction: systemInstructionOverride,
@@ -2095,7 +2095,15 @@ app.post("/api/generate-soal", async (req, res) => {
             `Pernyataan 4 tentang ${q.materi || 'materi ini'}`
           ];
         }
-        return { ...q, imagePrompt: promptStr, imagenPrompt: promptStr };
+        // Validate and normalize PGK answer key (must contain 2+ comma-separated letters)
+        let pgkKey = (q.answerKey || "").trim();
+        if (!pgkKey || !pgkKey.includes(",")) {
+          // Generate a valid random 2-option answer key
+          const allOpts = ["A", "B", "C", "D"];
+          const shuffledPGK = [...allOpts].sort(() => Math.random() - 0.5);
+          pgkKey = `${shuffledPGK[0]}, ${shuffledPGK[1]}`;
+        }
+        return { ...q, answerKey: pgkKey, imagePrompt: "", imagenPrompt: "", imageUrl: "", svgContent: "" };
       }
 
       if (q.questionType === "Menjodohkan") {
@@ -2106,7 +2114,11 @@ app.post("/api/generate-soal", async (req, res) => {
             { question: `Konsep C (${q.materi || 'Materi'})`, answer: "Pasangan C" }
           ];
         }
-        return { ...q, imagePrompt: promptStr, imagenPrompt: promptStr };
+        // Ensure questionText has a matching instruction
+        if (!q.questionText || !q.questionText.toLowerCase().includes("jodoh")) {
+          q.questionText = "Jodohkanlah pernyataan di kolom kiri dengan jawaban yang tepat di kolom kanan!";
+        }
+        return { ...q, options: [], answerKey: "Lihat pairs", imagePrompt: "", imagenPrompt: "", imageUrl: "", svgContent: "" };
       }
 
       if (q.questionType !== "Pilihan Ganda") {

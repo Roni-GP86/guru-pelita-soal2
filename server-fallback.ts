@@ -810,8 +810,16 @@ export function generateFallbackKisiKisi(schoolInfo: any, subject: string, selec
 
       let answerKeyDesc = "Jawaban singkat benar";
       if (type === "Pilihan Ganda") {
+        // Fisher-Yates based random — NEVER use modulo index (causes A,B,C,D,A,B,C,D pattern!)
         const letters = ["A", "B", "C", "D"];
-        answerKeyDesc = letters[(numberIndex - 1) % 4];
+        answerKeyDesc = letters[Math.floor(Math.random() * 4)];
+      } else if (type === "Pilihan Ganda Kompleks") {
+        // Pick 2 random distinct correct answers
+        const pgkOpts = ["A", "B", "C", "D"];
+        const shuffled = pgkOpts.sort(() => Math.random() - 0.5);
+        answerKeyDesc = `${shuffled[0]}, ${shuffled[1]}`;
+      } else if (type === "Menjodohkan") {
+        answerKeyDesc = "Lihat pairs";
       } else if (type === "Uraian") {
         answerKeyDesc = "Penjelasan/uraian benar";
       }
