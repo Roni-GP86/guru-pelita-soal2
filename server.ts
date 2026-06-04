@@ -1494,15 +1494,17 @@ function cleanMateriInServer(materiStr: string): string {
 }
 
 // Helper to programmatically clean answer keys specifically for multiple choice inside the Kisi-Kisi layout
+// Uses Fisher-Yates based random to DESTROY any sequential A,B,C,D pattern
 function cleanKisiKisiAnswerKey(answerKey: string, questionType: string, index: number): string {
   const cleanType = (questionType || "").trim().toLowerCase();
   let key = (answerKey || "").trim();
   
   if (cleanType === "pilihan ganda") {
-    // If it contains multiple options or placeholders, return a single deterministic option letter
-    if (key.toLowerCase().includes("atau") || key.toLowerCase().includes("/") || key.toLowerCase().includes(",")) {
+    // If it contains multiple options, ambiguous separators, or is completely missing → pick RANDOM letter
+    if (key.toLowerCase().includes("atau") || key.toLowerCase().includes("/") || key.toLowerCase().includes(",") || key === "") {
+      // Use Math.random() — NEVER index % 4 (that creates A,B,C,D,A,B,C,D pattern!)
       const letters = ["A", "B", "C", "D"];
-      return letters[index % 4];
+      return letters[Math.floor(Math.random() * 4)];
     }
     const match = key.match(/^[a-dA-D](?:\b|[.\s\)]|$)/);
     if (match) {
@@ -1512,8 +1514,24 @@ function cleanKisiKisiAnswerKey(answerKey: string, questionType: string, index: 
     if (generalMatch) {
       return generalMatch[1].toUpperCase();
     }
+    // Last resort: random, NEVER sequential
     const letters = ["A", "B", "C", "D"];
-    return letters[index % 4];
+    return letters[Math.floor(Math.random() * 4)];
+  }
+
+  if (cleanType === "pilihan ganda kompleks") {
+    // For PGK, if key is missing or invalid, return a valid multi-answer format
+    if (!key || key === "" || key.toLowerCase() === "lihat pairs") {
+      const allOpts = ["A", "B", "C", "D"];
+      // Pick 2 random correct answers
+      const shuffled = allOpts.sort(() => Math.random() - 0.5);
+      return `${shuffled[0]}, ${shuffled[1]}`;
+    }
+    return key;
+  }
+
+  if (cleanType === "menjodohkan") {
+    return "Lihat pairs";
   }
   
   return key;
@@ -1678,6 +1696,8 @@ app.post("/api/generate-kisi-kisi", async (req, res) => {
       - Buat urutan nomor soal yang berkesinambungan dari 1 sampai total soal yang diminta.
       - Distribusikan materi-materi secara proporsional ke dalam konfigurasi jumlah soal.
       - Tentukan "capaian pembelajaran", "elemen", "materi", "indikator soal", "level kognitif", "bentuk soal", dan "kunci jawaban" ideal untuk setiap nomor.
+      - ⚠️ WAJIB IKUTI KONFIGURASI JENIS SOAL: Jumlah dan jenis soal HARUS PERSIS sesuai "Konfigurasi Jumlah dan Jenis Soal" di atas. Jika ada 'Pilihan Ganda Kompleks', WAJIB gunakan bentuk soal 'Pilihan Ganda Kompleks'. Jika ada 'Menjodohkan', WAJIB gunakan 'Menjodohkan'. JANGAN ubah jenis soal menjadi 'Pilihan Ganda' biasa!
+      - ⚠️ ACAK KUNCI JAWABAN PG: Untuk soal Pilihan Ganda, kunci jawaban (A/B/C/D) WAJIB diacak total dan benar-benar tidak berpola. DILARANG KERAS pola A,B,C,D,A,B,C,D berulang!
 
       Hasilkan keluaran JSON murni sesuai skema pendukung.
     `;
@@ -1720,11 +1740,11 @@ app.post("/api/generate-kisi-kisi", async (req, res) => {
               },
               questionType: {
                 type: Type.STRING,
-                description: "Bentuk Soal: harus bernilai 'Pilihan Ganda', 'Isian Singkat', atau 'Uraian'.",
+                description: "Bentuk Soal: HARUS SAMA PERSIS dengan yang ada di Konfigurasi Jumlah dan Jenis Soal. Nilai yang diperbolehkan: 'Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Menjodohkan', 'Isian Singkat', atau 'Uraian'.",
               },
               answerKey: {
                 type: Type.STRING,
-                description: "Kunci jawaban tunggal yang benar. Khusus untuk 'Pilihan Ganda', Anda WAJIB hanya menuliskan satu huruf pilihan (misalnya 'A', 'B', 'C', atau 'D') tanpa teks tambahan lainnya. Untuk Isian Singkat atau Uraian, tuliskan jawaban kunci yang tepat secara ringkas.",
+                description: "Kunci jawaban. Untuk 'Pilihan Ganda', wajib satu huruf saja (A, B, C, atau D) yang diacak benar-benar acak dan tidak berpola. Untuk 'Pilihan Ganda Kompleks', tulis huruf jawaban benar dipisah koma (contoh: 'A, C'). Untuk 'Menjodohkan', tulis 'Lihat pairs'. Untuk Isian/Uraian, tulis jawaban kunci singkat.",
               },
             },
             required: ["number", "cp", "element", "materi", "indicator", "cognitiveLevel", "questionType", "answerKey"],

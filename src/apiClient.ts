@@ -90,12 +90,23 @@ export function cleanKisiKisiAnswerKey(answerKey: string, questionType: string, 
     if (generalMatch) {
       return generalMatch[1].toUpperCase();
     }
-    
-    // Fallback: Randomize completely instead of sequential pattern
+    // Fallback: RANDOM — NEVER index % 4 (causes A,B,C,D,A,B,C,D pattern!)
     const letters = ["A", "B", "C", "D"];
-    // using index as a salt but shuffling it up nicely, or just random
-    // since this is a fallback, random is fine
     return letters[Math.floor(Math.random() * 4)];
+  }
+
+  if (cleanType === "pilihan ganda kompleks") {
+    // Return valid multi-answer format if missing or invalid
+    if (!key || key === "" || key.toLowerCase() === "lihat pairs") {
+      const allOpts = ["A", "B", "C", "D"];
+      const shuffled = allOpts.sort(() => Math.random() - 0.5);
+      return `${shuffled[0]}, ${shuffled[1]}`;
+    }
+    return key;
+  }
+
+  if (cleanType === "menjodohkan") {
+    return "Lihat pairs";
   }
   
   return key;
@@ -811,6 +822,8 @@ export async function apiGenerateKisiKisi(
         SANGAT PENTING:
         - Jangan pasangkan stimulus gambar apa pun.
         - Isi 'indicator' dengan indikator bersih langsung menerangkan stimulus teks/data.
+        - ⚠️ WAJIB IKUTI KONFIGURASI JENIS SOAL: Jumlah dan jenis soal HARUS PERSIS sesuai Konfigurasi di atas. Jika ada 'Pilihan Ganda Kompleks', WAJIB gunakan 'Pilihan Ganda Kompleks'. Jika ada 'Menjodohkan', WAJIB gunakan 'Menjodohkan'. JANGAN ubah ke 'Pilihan Ganda' biasa!
+        - ⚠️ ACAK KUNCI JAWABAN PG: Untuk soal Pilihan Ganda, kunci jawaban (A/B/C/D) WAJIB diacak total, tidak berpola. DILARANG pola A,B,C,D,A,B,C,D berulang!
         - Format keluaran JSON murni.
       `;
 
