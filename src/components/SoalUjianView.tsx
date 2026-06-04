@@ -1432,66 +1432,62 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
     }
   };
 
-  // Click-to-regenerate AI image
+  // Click-to-regenerate AI image directly from browser (Bypasses Netlify Timeout!)
   const handleRegenerateImageAI = async () => {
     if (!editingQuestion) return;
     setRegeneratingImage(true);
     setImageError(null);
     try {
-      const res = await fetch("/api/generate-individual-image", {
+      // Dapatkan kunci API secara langsung dari local storage atau fallback developer key
+      const userKey = localStorage.getItem("ttu_user_api_key") || localStorage.getItem("gemini_api_key") || "AIzaSyDUqQ7LNP_3dUy4uOCjcx_hbRwLgi8bEpU";
+      
+      const prompt = `Sebagai seorang Graphic Designer dan SVG Illustrator senior untuk buku cetak Kurikulum SD di Indonesia, tolong hasilkan HANYA 1 KODE SVG MURNI (berupa <svg>...</svg> saja tanpa markdown \`\`\`) untuk mengilustrasikan soal berikut:
+Mata Pelajaran: ${subject}
+Pokok Bahasan: ${editingQuestion.materi}
+Cerita/Konteks: ${editingQuestion.stimulusText || "Tidak ada stimulus spesifik"}
+Pertanyaan: ${editingQuestion.questionText}
+
+INSTRUKSI DESAIN SVG:
+- Wajib menggunakan atribut viewBox="0 0 500 300".
+- Desain harus bersih, jelas, dan relevan dengan gaya ilustrasi buku pelajaran sekolah dasar.
+- Gunakan warna yang tidak terlalu mencolok (pastel) namun berkarakter.
+- NEGATIVE PROMPT (LARANGAN KERAS): TIDAK BOLEH memasukkan TEKS, HURUF, atau ANGKA apapun di dalam gambar. HANYA gambar visual!
+- TIDAK BOLEH memasukkan teks penjelasan apapun sebelum/sesudah tag <svg>. HANYA dan MURNI kode SVG.`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${userKey}`, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-user-api-key": localStorage.getItem("ttu_user_api_key") || ""
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          subject,
-          question: editingQuestion,
-          userApiKey: localStorage.getItem("ttu_user_api_key") || "",
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 2500 }
         })
       });
 
       if (!res.ok) {
-        let errMsg = "Gagal membangkitkan ilustrasi cerdas dari server.";
-        try {
-          const errText = await res.text();
-          if (errText.includes("Rate exceeded") || errText.includes("rate limit") || res.status === 429) {
-            errMsg = "Silakan klik regenerasi gambar kembali dalam beberapa detik. Batas limit kuota gambar AI (Rate Limit) terlampaui saat ini.";
-          } else {
-            try {
-              const errJson = JSON.parse(errText);
-              errMsg = errJson.error || errMsg;
-            } catch {
-              if (errText && errText.trim().length > 0) {
-                errMsg = errText.trim();
-              }
-            }
-          }
-        } catch (e) {
-          // ignore
-        }
+        let errMsg = "Koneksi ke sistem AI terputus atau API Key tidak valid.";
+        if (res.status === 429) errMsg = "Batas harian pembuatan gambar AI (Rate Limit) terlampaui. Mohon tunggu sebentar dan coba lagi.";
         throw new Error(errMsg);
       }
 
-      const data = await res.json();
-      if (data.svgContent && data.svgContent.trim()) {
+      const rawData = await res.json();
+      let svgCode = rawData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      
+      // Bersihkan markdown dari output SVG
+      svgCode = svgCode.replace(/```xml/g, "").replace(/```svg/g, "").replace(/```html/g, "").replace(/```/g, "").trim();
+      const svgMatch = svgCode.match(/<svg[\s\S]*<\/svg>/i);
+      
+      if (svgMatch && svgMatch[0]) {
         setEditingQuestion({
           ...editingQuestion,
-          svgContent: data.svgContent,
-          imageUrl: "" // reset direct image url when SVG is adopted
-        });
-      } else if (data.imageUrl) {
-        setEditingQuestion({
-          ...editingQuestion,
-          imageUrl: data.imageUrl,
-          svgContent: "" // reset SVG when image is adopted
+          svgContent: svgMatch[0],
+          imageUrl: "" // reset URL jika SVG sukses
         });
       } else {
-        throw new Error("Sistem AI tidak melahirkan kode gambar atau SVG pembelajaran yang valid.");
+        throw new Error("AI gagal memahami instruksi dan gagal merumuskan format gambar SVG yang tepat.");
       }
     } catch (err: any) {
-      console.error("Regen error:", err);
-      setImageError(err.message || "Gagal merumuskan gambar AI.");
+      console.error("Client-side Regen error:", err);
+      setImageError(err.message || "Gagal merumuskan gambar SVG AI.");
     } finally {
       setRegeneratingImage(false);
     }
@@ -3084,7 +3080,7 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
                       <button
                         type="button"
                         onClick={() => {
-                          const standardPrompt = `Ultra realistic educational photography of elementary school children in Indonesia, showing ${editingQuestion.questionType === "Pilihan Ganda" ? "answering questions about " + editingQuestion.materi : "observing realistic objects of " + editingQuestion.materi}, authentic Indonesian school environment, natural lighting, realistic environment, natural human pose, DSLR quality, highly detailed textures, realistic shadows, natural smiles, documentary style photography, depth of field, 8k detail, no text, no watermark, no distortion.`;
+                          const standardPrompt = `Ultra realistic educational photography of elementary school children in Indonesia, showing ${editingQuestion.questionType === "Pilihan Ganda" ? "answering questions about " + editingQuestion.materi : "observing realistic objects of " + editingQuestion.materi}, authentic Indonesian school environment, natural lighting, realistic environment, natural human pose, DSLR quality, highly detailed textures, realistic shadows, natural smiles, documentary style photography, depth of field, 8k detail. NEGATIVE PROMPT (DO NOT INCLUDE): NO TEXT, NO LETTERS, NO NUMBERS, NO WATERMARK, NO DISTORTION, NO CARTOON, NO WEIRD OBJECTS, NO EXTRA LIMBS.`;
                           setEditingQuestion({ ...editingQuestion, imagenPrompt: standardPrompt });
                         }}
                         className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 cursor-pointer shadow-2xs"

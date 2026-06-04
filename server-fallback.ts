@@ -1258,7 +1258,23 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
     let finalPairs: any[] = [];
     
     if (type === "Pilihan Ganda") {
-      finalOptions = opts;
+      // Force shuffle options for offline fallback to destroy sequential patterns
+      let rawOpts = [...opts];
+      const originalCorrectOpt = opts[key.toLowerCase().charCodeAt(0) - 97];
+      
+      for (let i = rawOpts.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rawOpts[i], rawOpts[j]] = [rawOpts[j], rawOpts[i]];
+      }
+      
+      let newCorrectIdx = 0;
+      finalOptions = rawOpts.map((opt, idx) => {
+        if (opt === originalCorrectOpt) {
+          newCorrectIdx = idx;
+        }
+        return `${String.fromCharCode(65 + idx)}. ${opt.replace(/^[A-D][.\s)]+/, "").trim()}`;
+      });
+      key = String.fromCharCode(97 + newCorrectIdx);
     } else if (type === "Pilihan Ganda Kompleks") {
       finalOptions = [
         `Konsep A mengenai ${topic} yang dipelajari`,
