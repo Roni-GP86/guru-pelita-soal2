@@ -1614,7 +1614,7 @@ app.post("/api/generate-kisi-kisi", async (req, res) => {
     const { rules: subjectRules, systemInstruction: systemInstructionOverride } = getSubjectSpecificRules(subject, schoolInfo?.gradeClass || "Sekolah Dasar");
 
     const totalQuestions = questionConfigs.reduce((sum: number, item: any) => sum + (Number(item.count) || 0), 0) || 10;
-    const targetImageCount = 0;
+    const targetImageCount = Math.max(1, Math.floor(totalQuestions * 0.25));
 
     const ai = getAiClient();
     const prompt = `
@@ -1637,11 +1637,12 @@ app.post("/api/generate-kisi-kisi", async (req, res) => {
       ${subjectRules}
 
       ==================================================================
-      LARANGAN KERAS STIMULUS BERGAMBAR / ILUSTRASI:
+      ATURAN PROPORSIONAL STIMULUS BERGAMBAR / ILUSTRASI (SANGAT KETAT):
       ==================================================================
-      - Anda SANGAT DILARANG MERANCANG jenis soal apa pun untuk dipasangkan stimulus visual (gambar, ilustrasi, foto, diagram gambar, grafik gambar, dsb). Semua soal harus bebas dari gambar fisik.
-      - Kolom Indikator Soal (indicator) SANGAT DILARANG diawali dengan kata-kata terkait gambar fisik (seperti "Disajikan gambar...", "Disajikan ilustrasi...", dsb). No image/visual stimulus is allowed!
-      - ISI NILAI KOLOM 'indicator' HARUS BERUPA INDIKATOR BERSIH yang langsung mendeskripsikan stimulus teks/data dan tugas siswa secara profesional. JANGAN PERNAH menambahkan prefiks "Stimulus:" di awal teks indikator. Tuliskan indikator secara langsung dan elegan!
+      - Anda WAJIB MENGALOKASIKAN TEPAT ${targetImageCount} SOAL untuk dipasangkan stimulus bergambar. Gunakan ini khusus untuk soal yang benar-benar memerlukan penalaran visual, eksperimen sains, grafik matematika, siklus makhluk hidup, atau analisis gambar cerita yang kompleks.
+      - Kolom Indikator Soal (indicator) untuk soal bergambar WAJIB diawali dengan: "Disajikan gambar...", "Disajikan ilustrasi...", "Perhatikan gambar...", atau "Perhatikan grafik...".
+      - SISA SOAL lainnya HARUS BEBAS dari gambar fisik.
+      - ISI NILAI KOLOM 'indicator' HARUS BERUPA INDIKATOR BERSIH yang langsung mendeskripsikan stimulus teks/data dan tugas siswa secara profesional. Tuliskan indikator secara langsung dan elegan!
 
       ==================================================================
       11 PILIHAN KOMBINASI STIMULUS TEKS/DATA KELAS TINGGI (SANGAT DIANJURKAN & MANDATORI BERVARIASI):
@@ -1856,8 +1857,8 @@ app.post("/api/generate-soal", async (req, res) => {
     visualKisiKisiIndices.clear();
 
     // SISTEM WAJIB menghitung otomatis jumlah soal bergambar berdasarkan total soal.
-    // Diatur menjadi 0 untuk dilarang ada soal bergambar
-    const targetImageCount = 0;
+    // Memenuhi kuota ketat 25% soal bergambar/visual berdasarkan jumlah soal yang ada
+    const targetImageCount = Math.max(1, Math.floor(numQuestions * 0.25));
     const designatedImageQuestions: number[] = [];
 
     const prompt = `
@@ -1915,14 +1916,14 @@ app.post("/api/generate-soal", async (req, res) => {
       - SANGAT DILARANG: Orang dewasa, model remaja, gaya anime/fantasi, seragam luar negeri, atau ekspresi berlebihan.
 
       ==================================================================
-      LARANGAN KERAS STIMULUS BERGAMBAR / ILUSTRASI:
+      PEMBAGIAN TUGAS STIMULUS VISUAL (SANGAT PENTING):
       ==================================================================
-      - Anda SANGAT DILARANG menyertakan gambar, ilustrasi, lukisan, foto, sketsa, diagram gambar, atau visual apa pun di seluruh naskah soal.
-      - SANGAT DILARANG menggunakan awalan "Perhatikan gambar berikut!" atau sejenisnya pada seluruh teks pertanyaan atau stimulus. No image/visual stimulus is allowed!
-      - Kosongkan properti 'visualAnalysis' (isi dengan null/kosong).
+      - PERHATIKAN: Ada TEPAT ${targetImageCount} soal yang ditunjuk wajib menggunakan stimulus visual (berdasarkan kisi-kisi). Untuk soal bergambar:
+      - JIKA SOAL MATEMATIKA (Pecahan/Geometri/Pengukuran) atau SAINS (Rantai makanan/Peta/Biologi): WAJIB ISI properti "svgContent" dengan XML SVG buatan tangan yang presisi, indah, dan mendidik.
+      - JIKA SOAL LINGKUNGAN/SOSIAL/OLAHRAGA (Aktivitas Manusia/Alam/Olahraga): WAJIB KOSONGKAN "svgContent", TAPI ISI "imagePrompt" dan "imagenPrompt" dengan prompt deskripsi foto yang mendalam dalam Bahasa Inggris (Ultra realistic educational photography...). "visualAnalysis" WAJIB diisi.
+      - JIKA SOAL BUKAN BERGAMBAR (TEKS MURNI): Kosongkan properti 'visualAnalysis', 'imagePrompt', 'imagenPrompt', 'imageUrl', dan 'svgContent'.
       - JIKA TIPE "Pilihan Ganda Kompleks": Sediakan 4 "options" berupa pernyataan-pernyataan. Kunci jawaban "answerKey" berisi huruf jawaban benar yang dipisah koma (misal: "A, C").
       - JIKA TIPE "Menjodohkan": Anda WAJIB mengisi properti "pairs" dengan 3-4 pasang { question: "...", answer: "..." }. "questionText" bisa diisi instruksi seperti "Jodohkanlah pernyataan di kolom kiri dengan jawaban yang tepat di kolom kanan!". "options" dikosongkan.
-      - Kosongkan properti 'imagePrompt', 'imagenPrompt', 'imageUrl', dan 'svgContent' (isi dengan murni string kosong "").
 
       ==================================================================
       ATURAN ANTI-REDUNDANSI & DUPLIKASI STIMULUS (SANGAT KETAT):
