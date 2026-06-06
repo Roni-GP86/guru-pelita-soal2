@@ -7,6 +7,7 @@ import SubjectAndTopicManager from "./components/SubjectAndTopicManager";
 import QuestionConfigForm from "./components/QuestionConfigForm";
 import KisiKisiView from "./components/KisiKisiView";
 import SoalUjianView from "./components/SoalUjianView";
+import BankSoalView from "./components/BankSoalView";
 import TutorialView from "./components/TutorialView";
 import PremiumLoader from "./components/PremiumLoader";
 import OpeningSplash from "./components/OpeningSplash";
@@ -36,7 +37,8 @@ import {
   X,
   PlayCircle,
   Megaphone,
-  Bell
+  Bell,
+  Folder
 } from "lucide-react";
 
 export default function App() {
@@ -626,6 +628,55 @@ export default function App() {
     }
   };
 
+  const handleLoadExam = (
+    savedSchoolInfo: SchoolInfo,
+    savedSubject: string,
+    savedKisiKisi: KisiKisiRow[],
+    savedQuestions: QuestionItem[]
+  ) => {
+    setSchoolInfo(savedSchoolInfo);
+    setSelectedSubject(savedSubject as SubjectType);
+    setKisiKisi(savedKisiKisi);
+    setQuestions(savedQuestions);
+    setActiveStep(5);
+    setSuccessToast("📂 Paket soal berhasil dimuat dari Bank Soal!");
+  };
+
+  const handleSaveToBank = () => {
+    if (questions.length === 0) {
+      setWarningToast("⚠️ Tidak ada soal yang bisa disimpan.");
+      return;
+    }
+
+    try {
+      const saved = localStorage.getItem("ttu_bank_soal");
+      let currentBank: any[] = [];
+      if (saved) {
+        currentBank = JSON.parse(saved);
+      }
+
+      const newItem = {
+        id: `exam-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        savedByCode: activeCode || "TRIAL",
+        subject: effectiveSelectedSubject,
+        gradeClass: effectiveSchoolInfo.gradeClass,
+        academicYear: effectiveSchoolInfo.academicYear || "2025/2026",
+        semester: effectiveSchoolInfo.semester || "I",
+        schoolInfo: effectiveSchoolInfo,
+        kisiKisi: kisiKisi,
+        questions: questions,
+        savedAt: new Date().toLocaleString("id-ID")
+      };
+
+      currentBank.unshift(newItem);
+      localStorage.setItem("ttu_bank_soal", JSON.stringify(currentBank));
+      setSuccessToast("💾 Soal berhasil disimpan ke Bank Soal!");
+    } catch (e) {
+      console.error("Failed to save exam to Bank Soal", e);
+      setWarningToast("⚠️ Gagal menyimpan soal.");
+    }
+  };
+
   const handleVerifyCodeProcess = async (val: string) => {
     if (val === "GP-PSR86") {
       setActiveCode(val);
@@ -742,6 +793,18 @@ export default function App() {
       activeTextColor: "text-emerald-600",
       borderActive: "border-emerald-500",
       badgeColor: "bg-emerald-100 text-emerald-700"
+    },
+    { 
+      num: 8, 
+      label: "Bank Soal", 
+      desc: "Arsip & Simpan Paket", 
+      icon: <Folder size={16} />, 
+      emoji: "📂",
+      colorClass: "from-amber-600 via-yellow-500 to-amber-500",
+      activeBg: "bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-lg shadow-amber-500/20",
+      activeTextColor: "text-amber-605",
+      borderActive: "border-amber-500",
+      badgeColor: "bg-amber-100 text-amber-700"
     },
     { 
       num: 6, 
@@ -1143,7 +1206,7 @@ export default function App() {
         )}
 
         {/* Main Workspace Area */}
-        <main className="flex-1 px-5 py-5 md:px-6 md:py-6 space-y-5 min-w-0 bg-slate-950/20 relative z-10">
+        <main className="flex-1 px-5 py-5 md:px-6 md:py-6 space-y-5 min-w-0 bg-slate-950/20 relative">
           
           {activeStep === 0 && (
             <TutorialView isAdmin={isAdmin} onShowToast={setSuccessToast} />
@@ -1360,6 +1423,17 @@ export default function App() {
                   subject={effectiveSelectedSubject}
                   questions={questions}
                   onUpdateQuestions={setQuestions}
+                  onSaveToBank={handleSaveToBank}
+                />
+              )}
+
+              {activeStep === 8 && (
+                <BankSoalView
+                  activeCode={activeCode}
+                  isCodeActive={isCodeActive}
+                  isAdmin={isAdmin}
+                  onLoadExam={handleLoadExam}
+                  onShowToast={setSuccessToast}
                 />
               )}
 
@@ -1741,7 +1815,7 @@ export default function App() {
                 </div>
               )}
            {/* Tombol Navigasi Bawah */}
-          {!generatingKisiKisi && !generatingSoal && (
+          {!generatingKisiKisi && !generatingSoal && activeStep >= 1 && activeStep <= 5 && (
             <div className="flex justify-between items-center bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 shadow-md">
               <button
                 id="btn-nav-prev"

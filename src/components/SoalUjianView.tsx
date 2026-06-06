@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { SchoolInfo, QuestionItem } from "../types";
 import PremiumLoader from "./PremiumLoader";
 import QuestionWithImage from "./QuestionWithImage";
-import { generateAllImages, hitungSoalBergambar } from "../imageUtils";
+import { generateAllImages, hitungSoalBergambar, generateImageForSoal } from "../imageUtils";
 import { 
   FileDown, 
   Printer, 
@@ -798,9 +798,10 @@ interface SoalUjianViewProps {
   subject: string;
   questions: QuestionItem[];
   onUpdateQuestions?: (questions: QuestionItem[]) => void;
+  onSaveToBank?: () => void;
 }
 
-export default function SoalUjianView({ schoolInfo, subject, questions, onUpdateQuestions }: SoalUjianViewProps) {
+export default function SoalUjianView({ schoolInfo, subject, questions, onUpdateQuestions, onSaveToBank }: SoalUjianViewProps) {
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadingWord, setDownloadingWord] = useState(false);
   const [activeTab, setActiveTab ] = useState<"siswa" | "kunci" | "pedoman">("siswa");
@@ -812,8 +813,8 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
 
   const leftLogo = getLogoKabupatenUrl(schoolInfo);
   const rightLogo = getLogoSekolahUrl(schoolInfo);
-  const hasLeft = !!leftLogo;
-  const hasRight = !!rightLogo;
+  const hasLeft = !!leftLogo && (schoolInfo.showLogoKabupaten !== false);
+  const hasRight = !!rightLogo && (schoolInfo.showLogoSekolah !== false);
 
   const [logo1Size, setLogo1Size] = useState(() => {
     try {
@@ -1026,6 +1027,7 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
   const [editingQuestion, setEditingQuestion] = useState<QuestionItem | null>(null);
   const [modalTab, setModalTab] = useState<"content" | "media">("content");
   const [regeneratingImage, setRegeneratingImage] = useState(false);
+  const [generatingImagenSingle, setGeneratingImagenSingle] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
   const getFormattedDate = () => {
@@ -1332,83 +1334,33 @@ export default function SoalUjianView({ schoolInfo, subject, questions, onUpdate
     await new Promise((resolve) => setTimeout(resolve, 800));
 
     try {
-      // Inject a temporary print-only stylesheet that hides everything except the document
-      const printStyleId = "pelita-soal-print-style";
-      let printStyle = document.getElementById(printStyleId) as HTMLStyleElement | null;
-      if (!printStyle) {
-        printStyle = document.createElement("style");
-        printStyle.id = printStyleId;
-        document.head.appendChild(printStyle);
-      }
-
       const fileSuffix = activeTab === "siswa" 
-        ? "Naskah Soal" 
+        ? "Naskah_Soal" 
         : activeTab === "kunci" 
-          ? "Kunci Jawaban" 
-          : "Pedoman Penskoran";
+          ? "Kunci_Jawaban" 
+          : "Pedoman_Penskoran";
 
-      printStyle.innerHTML = `
-        @media print {
-          @page {
-            size: A4 portrait;
-            margin: 20mm 20mm 20mm 20mm;
-          }
-          /* Hide everything on the page */
-          body > * { display: none !important; }
-          /* Show only the print area */
-          #soal-ujian-print-area,
-          #soal-ujian-print-area * {
-            display: revert !important;
-            visibility: visible !important;
-          }
-          /* Position the print area to fill the page */
-          #soal-ujian-print-area {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            box-shadow: none !important;
-            background: white !important;
-            font-family: "Times New Roman", Times, serif !important;
-            font-size: 12pt !important;
-            line-height: 1.5 !important;
-            color: #000000 !important;
-          }
-          /* Ensure buttons and UI elements are hidden */
-          button, .no-print, [data-no-export], .no-export,
-          .bingkai-emas-premium > :not(.lg\\:col-span-4),
-          nav, header, aside { display: none !important; }
-          /* Default text: rata kiri */
-          p, div, li, span, td { 
-            text-align: left !important;
-          }
-          /* KOP dan Judul: rata tengah */
-          .kop, .kop *, .document-title, .signature-table td, th, .text-center {
-            text-align: center !important;
-          }
-          /* Page break controls */
-          .question-block, tr, .signature-table, .key-block, .identitas-table {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-          /* Remove screen-only decorations */
-          * { 
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-        }
-      `;
+      await withPdfStylesPatch(async () => {
+        const html2pdf = await getHtml2Pdf();
+        const element = printAreaRef.current;
+        if (!element) return;
 
-      // Trigger print dialog
-      window.print();
+        // Add class to apply PDF style properties
+        element.classList.add("pdf-export-mode-soal");
 
-      // Cleanup after dialog closes
-      setTimeout(() => {
-        printStyle!.innerHTML = "";
-      }, 2000);
+        const opt = {
+          margin:       [15, 15, 15, 15],
+          filename:     `${fileSuffix}_${subject.replace(/\s+/g, '_')}_${schoolInfo.gradeClass.replace(/\s+/g, '_')}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, logging: false },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        await html2pdf().set(opt).from(element).save();
+
+        // Restore styles
+        element.classList.remove("pdf-export-mode-soal");
+      });
 
     } catch (err: any) {
       console.error("Gagal mencetak PDF:", err);
@@ -1490,6 +1442,25 @@ INSTRUKSI DESAIN SVG:
       setImageError(err.message || "Gagal merumuskan gambar SVG AI.");
     } finally {
       setRegeneratingImage(false);
+    }
+  };
+
+  const handleGenerateImagenSingle = async () => {
+    if (!editingQuestion) return;
+    setGeneratingImagenSingle(true);
+    setImageError(null);
+    try {
+      const updatedQ = await generateImageForSoal(subject, editingQuestion);
+      if (updatedQ.imageUrl && updatedQ.imageUrl.startsWith("data:")) {
+        setEditingQuestion(updatedQ);
+      } else {
+        throw new Error("Gagal menghasilkan gambar dari API. Silakan periksa koneksi dan validitas API Key Anda.");
+      }
+    } catch (err: any) {
+      console.error("Single Imagen generation error:", err);
+      setImageError(err.message || "Gagal menghasilkan gambar foto realistis.");
+    } finally {
+      setGeneratingImagenSingle(false);
     }
   };
 
@@ -1666,6 +1637,17 @@ INSTRUKSI DESAIN SVG:
             {downloadingPdf ? "Memproses..." : "Unduh PDF"}
           </button>
 
+          {onSaveToBank && (
+            <button
+              id="btn-save-to-bank"
+              type="button"
+              onClick={onSaveToBank}
+              className="px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-[11px] rounded-xl inline-flex items-center gap-1.5 transition-all duration-305 shadow-md hover:shadow-emerald-500/10 cursor-pointer"
+            >
+              <span className="text-sm">💾</span> Simpan Soal
+            </button>
+          )}
+
           {/* MEN DOWNLOAD DOKUMEN PENSKORAN & RUMUS NILAI AKHIR */}
           <div className="relative" id="menu-download-pedoman-root">
             <button
@@ -1803,6 +1785,12 @@ INSTRUKSI DESAIN SVG:
               .pdf-export-mode-soal .text-center,
               .pdf-export-mode-soal [style*="text-align: center"] {
                 text-align: center !important;
+              }
+              .pdf-export-mode-soal .no-print,
+              .pdf-export-mode-soal .no-export,
+              .pdf-export-mode-soal button,
+              .pdf-export-mode-soal [data-no-export] {
+                display: none !important;
               }
             `}} />
             {/* SAKLAR TAMPILAN SISWA */}
@@ -1949,18 +1937,18 @@ INSTRUKSI DESAIN SVG:
                             <tbody>
                               <tr>
                                 <td style={{ width: "50%", border: "none", padding: "2px 8px 2px 0px", fontSize: "12pt", lineHeight: "1.5", verticalAlign: "top" }}>
-                                  <span style={{ fontWeight: "bold", marginRight: "6px" }}>A.</span>{q.options[0]?.replace(/^[Aa]\.\s*/, "")}
+                                  <span style={{ marginRight: "6px" }}>A.</span>{q.options[0]?.replace(/^[Aa]\.\s*/, "")}
                                 </td>
                                 <td style={{ width: "50%", border: "none", padding: "2px 0px 2px 8px", fontSize: "12pt", lineHeight: "1.5", verticalAlign: "top" }}>
-                                  <span style={{ fontWeight: "bold", marginRight: "6px" }}>C.</span>{q.options[2]?.replace(/^[Cc]\.\s*/, "")}
+                                  <span style={{ marginRight: "6px" }}>C.</span>{q.options[2]?.replace(/^[Cc]\.\s*/, "")}
                                 </td>
                               </tr>
                               <tr>
                                 <td style={{ width: "50%", border: "none", padding: "2px 8px 2px 0px", fontSize: "12pt", lineHeight: "1.5", verticalAlign: "top" }}>
-                                  <span style={{ fontWeight: "bold", marginRight: "6px" }}>B.</span>{q.options[1]?.replace(/^[Bb]\.\s*/, "")}
+                                  <span style={{ marginRight: "6px" }}>B.</span>{q.options[1]?.replace(/^[Bb]\.\s*/, "")}
                                 </td>
                                 <td style={{ width: "50%", border: "none", padding: "2px 0px 2px 8px", fontSize: "12pt", lineHeight: "1.5", verticalAlign: "top" }}>
-                                  <span style={{ fontWeight: "bold", marginRight: "6px" }}>D.</span>{q.options[3]?.replace(/^[Dd]\.\s*/, "")}
+                                  <span style={{ marginRight: "6px" }}>D.</span>{q.options[3]?.replace(/^[Dd]\.\s*/, "")}
                                 </td>
                               </tr>
                             </tbody>
@@ -2015,14 +2003,20 @@ INSTRUKSI DESAIN SVG:
                             "Pernyataan 4 (Klik Edit untuk merubah)"
                           ];
                           return (
-                            <div style={{ fontFamily: '"Times New Roman", Times, serif', marginLeft: "20px", marginTop: "6px" }}>
-                              {pgkOpts.map((opt, oIdx) => (
-                                <div key={oIdx} style={{ display: "flex", alignItems: "flex-start", marginBottom: "4px" }}>
-                                  <div style={{ width: "16px", height: "16px", border: "1px solid black", marginRight: "8px", marginTop: "3px" }}></div>
-                                  <div style={{ fontSize: "12pt", lineHeight: "1.5" }}>{opt.replace(/^[a-eA-E]\.\s*/, "")}</div>
-                                </div>
-                              ))}
-                            </div>
+                            <table style={{ width: "100%", borderCollapse: "collapse", border: "none", marginLeft: "20px", marginTop: "6px", fontFamily: '"Times New Roman", Times, serif' }}>
+                              <tbody>
+                                {pgkOpts.map((opt, oIdx) => (
+                                  <tr key={oIdx}>
+                                    <td style={{ width: "24px", padding: "3px 0", verticalAlign: "middle" }}>
+                                      <div style={{ width: "14px", height: "14px", border: "1.5px solid #000000", display: "block" }}></div>
+                                    </td>
+                                    <td style={{ padding: "3px 0 3px 6px", fontSize: "12pt", lineHeight: "1.5", verticalAlign: "middle", textAlign: "left" }}>
+                                      {opt.replace(/^[a-eA-E0-9][.\s)]+\s*/, "")}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           );
                         })()}
                       </div>
@@ -2304,23 +2298,25 @@ INSTRUKSI DESAIN SVG:
                             </h4>
                             <div className="space-y-4" style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: "11pt" }}>
                               {pgkQuestions.map((q) => {
-                                const correctKeys = q.answerKey.toUpperCase().split(/[,;]/).map(k => k.trim());
+                                const correctKeys = (q.answerKey || "").toUpperCase().split(/[,;]/).map(k => k.trim());
                                 return (
                                   <div key={q.number} style={{ padding: "12px", border: "1px solid #000000", backgroundColor: "#ffffff" }}>
                                     <div style={{ fontWeight: "bold", marginBottom: "8px", color: "#000000" }}>Soal Nomor {q.number} (PGK)</div>
-                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                    <table style={{ width: "100%", borderCollapse: "collapse", border: "none", marginTop: "6px", fontFamily: '"Times New Roman", Times, serif' }}>
                                       <tbody>
                                         {(q.options || []).map((opt, oIdx) => {
                                           const letter = String.fromCharCode(65 + oIdx);
                                           const isCorrect = correctKeys.includes(letter);
                                           return (
                                             <tr key={oIdx}>
-                                              <td style={{ width: "40px", padding: "4px", verticalAlign: "top", textAlign: "center" }}>
-                                                <div style={{ width: "16px", height: "16px", border: "1px solid black", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold" }}>
+                                              <td style={{ width: "24px", padding: "3px 0", verticalAlign: "middle" }}>
+                                                <div style={{ width: "14px", height: "14px", border: "1.5px solid #000000", display: "block", textAlign: "center", lineHeight: "12px", fontSize: "11px", fontWeight: "bold", color: "#000000" }}>
                                                   {isCorrect ? "✓" : ""}
                                                 </div>
                                               </td>
-                                              <td style={{ padding: "4px", verticalAlign: "top" }}>{opt}</td>
+                                              <td style={{ padding: "3px 0 3px 6px", fontSize: "12pt", lineHeight: "1.5", verticalAlign: "middle", textAlign: "left" }}>
+                                                {opt.replace(/^[a-eA-E0-9][.\s)]+\s*/, "")}
+                                              </td>
                                             </tr>
                                           );
                                         })}
@@ -2343,15 +2339,20 @@ INSTRUKSI DESAIN SVG:
                               {menjodohkanQuestions.map((q) => {
                                 const sortedAnswers = [...(q.pairs || []).map(p => p.answer)].sort((a, b) => a.localeCompare(b));
                                 const pairsString = (q.pairs || []).map((p, pIdx) => {
-                                  const actualAnswerIdx = sortedAnswers.indexOf(p.answer);
+                                  const actualAnswerIdx = sortedAnswers.findIndex(ans => ans.toLowerCase().trim() === p.answer.toLowerCase().trim());
                                   const answerLetter = String.fromCharCode(65 + (actualAnswerIdx !== -1 ? actualAnswerIdx : pIdx));
                                   return `${pIdx + 1} = ${answerLetter}`;
                                 }).join(", ");
 
                                 return (
-                                  <div key={q.number} style={{ padding: "8px 12px", border: "1.5px solid #000000", borderRadius: "6px", backgroundColor: "#ffffff", textAlign: "left" }}>
-                                    <span style={{ fontWeight: "bold", color: "#000000", display: "block", marginBottom: "4px" }}>Nomor {q.number}:</span>
-                                    <span style={{ fontWeight: "900", color: "#000000", fontSize: "12pt" }}>{pairsString}</span>
+                                  <div key={q.number} style={{ padding: "12px", border: "1.5px solid #000000", borderRadius: "6px", backgroundColor: "#ffffff", textAlign: "left" }}>
+                                    <span style={{ fontWeight: "bold", color: "#000000", display: "block", marginBottom: "4px" }}>Nomor {q.number} (Menjodohkan):</span>
+                                    <span style={{ fontWeight: "900", color: "#000000", fontSize: "12pt", display: "block", marginBottom: "6px" }}>{pairsString}</span>
+                                    <div style={{ fontSize: "9.5pt", color: "#475569", borderTop: "1px dashed #cbd5e1", paddingTop: "4px" }}>
+                                      {(q.pairs || []).map((p, pIdx) => (
+                                        <div key={pIdx} style={{ marginTop: "2px" }}>• {pIdx + 1} ({p.question}) &rarr; {p.answer}</div>
+                                      ))}
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -2687,21 +2688,21 @@ INSTRUKSI DESAIN SVG:
 
       {/* DETAILED QUESTION & SVG IMAGE REGENERATOR MODAL */}
       {editingQuestion && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-6 overflow-y-auto scroll-smooth transition-all duration-300">
-          <div className="bg-white rounded-3xl shadow-2xl w-[94vw] max-w-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh] border border-slate-100 animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-6 overflow-y-auto scroll-smooth transition-all duration-300">
+          <div className="bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 rounded-3xl shadow-2xl w-[94vw] max-w-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh] border border-amber-500/20 animate-in fade-in zoom-in duration-200">
             
             {/* Modal Header */}
-            <div className="p-5 bg-slate-900 text-white flex items-center justify-between shrink-0">
+            <div className="p-5 bg-gradient-to-r from-amber-950/40 via-indigo-950/40 to-slate-950/75 border-b border-amber-500/20 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-500/20 text-indigo-300 rounded-xl flex items-center justify-center text-lg shadow-inner">
+                <div className="w-10 h-10 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl flex items-center justify-center text-lg shadow-inner">
                   ✏️
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm tracking-wide">
+                  <h3 className="font-extrabold text-sm tracking-wide text-slate-100 uppercase">
                     Sunting Butir Soal Nomor #{editingQuestion.number}
                   </h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5 font-medium">
-                    Atur konten pertanyaan, opsi pilihan, kunci, hingga visualisasi gambar SVG edukasi.
+                  <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                    Atur konten pertanyaan, opsi pilihan, kunci, hingga visualisasi gambar AI edukasi.
                   </p>
                 </div>
               </div>
@@ -2715,57 +2716,57 @@ INSTRUKSI DESAIN SVG:
             </div>
 
             {/* Modal Navigation Tabs */}
-            <div className="bg-slate-50 border-b border-slate-100 px-6 pt-2 flex items-center gap-4 shrink-0">
+            <div className="bg-slate-950/40 border-b border-slate-900/60 px-6 pt-2 flex items-center gap-4 shrink-0">
               <button
                 type="button"
                 onClick={() => setModalTab("content")}
-                className={`pb-2.5 text-xs font-bold transition-all relative ${
-                  modalTab === "content" ? "text-indigo-650" : "text-slate-400 hover:text-slate-700"
+                className={`pb-2.5 text-xs font-bold transition-all relative cursor-pointer ${
+                  modalTab === "content" ? "text-amber-400 font-extrabold" : "text-slate-400 hover:text-slate-200"
                 }`}
               >
                 📝 Konten &amp; Kunci Jawaban
                 {modalTab === "content" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-full" />
                 )}
               </button>
               <button
                 type="button"
                 onClick={() => setModalTab("media")}
-                className={`pb-2.5 text-xs font-bold transition-all relative flex items-center gap-1.5 ${
-                  modalTab === "media" ? "text-indigo-650" : "text-slate-400 hover:text-slate-700"
+                className={`pb-2.5 text-xs font-bold transition-all relative flex items-center gap-1.5 cursor-pointer ${
+                  modalTab === "media" ? "text-amber-400 font-extrabold" : "text-slate-400 hover:text-slate-200"
                 }`}
               >
-                🎨 Gambar Pendukung Soal Soal
+                🎨 Gambar Pendukung Soal
                 {(editingQuestion.svgContent || editingQuestion.imageUrl) && (
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block animate-ping" />
                 )}
                 {modalTab === "media" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-full" />
                 )}
               </button>
             </div>
 
             {/* Modal Body Scroll Container */}
-            <div className="p-6 overflow-y-auto flex-1 max-h-[calc(95vh-190px)] sm:max-h-[calc(90vh-190px)] space-y-4 scroll-smooth pr-5">
+            <div className="p-6 overflow-y-auto flex-1 max-h-[calc(95vh-190px)] sm:max-h-[calc(90vh-190px)] space-y-4 scroll-smooth pr-5 text-slate-200">
               
               {modalTab === "content" && (
                 <div className="space-y-4">
                   {/* Row 1: Pokok Bahasan */}
                   <div>
-                    <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">
+                    <label className="text-[11px] font-extrabold text-amber-500 uppercase tracking-wider block mb-1.5">
                       Materi / Pokok Bahasan
                     </label>
                     <input
                       type="text"
                       value={editingQuestion.materi}
                       onChange={(e) => setEditingQuestion({ ...editingQuestion, materi: e.target.value })}
-                      className="w-full text-xs font-semibold p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-150 transition-colors"
+                      className="w-full text-xs font-semibold p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl outline-hidden focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 text-slate-200 transition-colors"
                     />
                   </div>
 
                   {/* Stimulus */}
                   <div>
-                    <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">
+                    <label className="text-[11px] font-extrabold text-amber-500 uppercase tracking-wider block mb-1.5">
                       Teks Stimulus (Cerita / Deskripsi Konteks) <span className="text-slate-400 italic font-medium">(Opsional)</span>
                     </label>
                     <textarea
@@ -2773,31 +2774,31 @@ INSTRUKSI DESAIN SVG:
                       value={editingQuestion.stimulusText || ""}
                       onChange={(e) => setEditingQuestion({ ...editingQuestion, stimulusText: e.target.value })}
                       placeholder="Contoh: Roni membawa 3 keranjang mangga hasil panen ke pasar..."
-                      className="w-full text-xs font-semibold p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-150 transition-colors"
+                      className="w-full text-xs font-semibold p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl outline-hidden focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 text-slate-200 transition-colors"
                     />
                   </div>
 
                   {/* Teks Pertanyaan */}
                   <div>
-                    <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">
+                    <label className="text-[11px] font-extrabold text-amber-500 uppercase tracking-wider block mb-1.5">
                       Kalimat Pertanyaan Utama
                     </label>
                     <textarea
                       rows={3}
                       value={editingQuestion.questionText}
                       onChange={(e) => setEditingQuestion({ ...editingQuestion, questionText: e.target.value })}
-                      className="w-full text-xs font-semibold p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-150 transition-colors"
+                      className="w-full text-xs font-semibold p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl outline-hidden focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 text-slate-200 transition-colors"
                     />
                   </div>
 
                   {/* Opsi Pilihan Ganda */}
                   {editingQuestion.questionType === "Pilihan Ganda" && editingQuestion.options && (
-                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <div className="space-y-2 pt-2 border-t border-slate-800">
                       <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">
+                        <label className="text-[11px] font-extrabold text-amber-500 uppercase tracking-wider block">
                           Pilihan Alternatif Jawaban (A, B, C, D)
                         </label>
-                        <span className="text-[9.5px] text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-md select-none">
+                        <span className="text-[9.5px] text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md select-none">
                           Prefix Diatur Otomatis ✨
                         </span>
                       </div>
@@ -2806,8 +2807,8 @@ INSTRUKSI DESAIN SVG:
                           const letter = String.fromCharCode(65 + oIdx);
                           const cleanVal = opt.replace(/^[a-dA-D][.\s)]+/, "");
                           return (
-                            <div key={oIdx} className="flex items-center bg-slate-50 hover:bg-slate-100/70 rounded-xl border border-slate-200 overflow-hidden pr-2 transition-colors">
-                              <span className="bg-slate-200 text-slate-700 text-xs font-black px-3 py-2.5 shrink-0 select-none">
+                            <div key={oIdx} className="flex items-center bg-slate-950 hover:bg-slate-900/50 rounded-xl border border-slate-800 overflow-hidden pr-2 transition-colors">
+                              <span className="bg-slate-900 text-slate-300 border-r border-slate-800 text-xs font-black px-3 py-2.5 shrink-0 select-none">
                                 {letter}
                               </span>
                               <input
@@ -2819,7 +2820,7 @@ INSTRUKSI DESAIN SVG:
                                   newOpts[oIdx] = `${letter}. ${e.target.value}`;
                                   setEditingQuestion({ ...editingQuestion, options: newOpts });
                                 }}
-                                className="w-full text-xs font-bold p-2 bg-transparent outline-hidden text-slate-800"
+                                className="w-full text-xs font-bold p-2 bg-transparent outline-hidden text-slate-200"
                               />
                             </div>
                           );
@@ -2829,13 +2830,13 @@ INSTRUKSI DESAIN SVG:
                   )}
 
                   {/* Kunci Jawaban & Pembahasan */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
                     <div className="md:col-span-1">
-                      <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">
+                      <label className="text-[11px] font-extrabold text-amber-500 uppercase tracking-wider block mb-1.5">
                         Kunci Jawaban Definitif
                       </label>
                       {editingQuestion.questionType === "Pilihan Ganda" ? (
-                        <div className="flex bg-slate-100 border border-slate-200 p-1 rounded-2xl gap-1">
+                        <div className="flex bg-slate-950 border border-slate-855 p-1 rounded-2xl gap-1">
                           {["A", "B", "C", "D"].map((letter) => {
                             const isSelected = editingQuestion.answerKey.toUpperCase().trim() === letter || 
                               editingQuestion.answerKey.toUpperCase().trim().startsWith(letter + ".");
@@ -2846,8 +2847,8 @@ INSTRUKSI DESAIN SVG:
                                 onClick={() => setEditingQuestion({ ...editingQuestion, answerKey: letter.toLowerCase() })}
                                 className={`flex-1 py-1.5 font-black text-xs rounded-xl cursor-pointer transition-all ${
                                   isSelected 
-                                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-300" 
-                                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-200"
+                                    ? "bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-md shadow-amber-500/15" 
+                                    : "text-slate-450 hover:text-slate-250 hover:bg-slate-900"
                                 }`}
                               >
                                 {letter}
@@ -2860,19 +2861,19 @@ INSTRUKSI DESAIN SVG:
                           type="text"
                           value={editingQuestion.answerKey}
                           onChange={(e) => setEditingQuestion({ ...editingQuestion, answerKey: e.target.value })}
-                          className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-150 transition-colors"
+                          className="w-full text-xs font-bold p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl outline-hidden focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 text-slate-200 transition-colors"
                         />
                       )}
                     </div>
                     <div className="md:col-span-2">
-                      <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">
+                      <label className="text-[11px] font-extrabold text-amber-500 uppercase tracking-wider block mb-1.5">
                         Pedoman Penilaian / Penjelasan Pembahasan
                       </label>
                       <textarea
                         rows={2}
                         value={editingQuestion.explanation}
                         onChange={(e) => setEditingQuestion({ ...editingQuestion, explanation: e.target.value })}
-                        className="w-full text-xs font-medium p-2 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-400 focus:ring-1 focus:ring-indigo-150 transition-colors"
+                        className="w-full text-xs font-medium p-2 bg-slate-900/50 border border-slate-800 rounded-xl outline-hidden focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 text-slate-200 transition-colors"
                       />
                     </div>
                   </div>
@@ -2883,31 +2884,31 @@ INSTRUKSI DESAIN SVG:
                 <div className="space-y-4">
                   {/* Status & Visual Image Preview Sheet */}
                   <div>
-                    <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block mb-2">
+                    <span className="text-[11px] font-extrabold text-amber-500 uppercase tracking-wider block mb-2">
                       Pratinjau Visual Gambar Saat Ini
                     </span>
-                    <div className="min-h-[160px] bg-slate-50 rounded-2xl border border-slate-200/60 p-4 flex flex-col items-center justify-center relative overflow-hidden">
+                    <div className="min-h-[160px] bg-slate-955/40 rounded-2xl border border-slate-850 p-4 flex flex-col items-center justify-center relative overflow-hidden">
                       {editingQuestion.svgContent || editingQuestion.imageUrl ? (
                         <>
                           {renderQuestionIllustration(editingQuestion, subject)}
                           <div className="mt-2 flex gap-2">
-                            <span className="text-[10px] uppercase font-extrabold bg-indigo-50 border border-indigo-150 text-indigo-700 px-2 py-0.5 rounded-md">
+                            <span className="text-[10px] uppercase font-extrabold bg-amber-500/10 border border-amber-500/20 text-amber-450 px-2 py-0.5 rounded-md">
                               {editingQuestion.svgContent ? "Tipe SVG Pembelajaran" : "Tipe Foto / Link"}
                             </span>
                             <button
                               type="button"
                               onClick={handleRemoveImage}
-                              className="text-[10px] text-red-500 font-bold hover:underline"
+                              className="text-[10px] text-red-400 font-bold hover:text-red-300 hover:underline cursor-pointer"
                             >
                               Hapus Gambar
                             </button>
                           </div>
                         </>
                       ) : (
-                        <div className="text-center space-y-1.5 p-4 text-slate-400">
-                          <ImageIcon size={32} className="mx-auto block stroke-1" />
-                          <p className="text-xs font-bold text-slate-500">Soal ini belum bersenjatakan gambar ilustrasi</p>
-                          <p className="text-[10px] text-slate-400">Anda dapat menyusun gambar baru menggunakan kecerdasan buas AI atau mengunggah manual.</p>
+                        <div className="text-center space-y-1.5 p-4 text-slate-500">
+                          <ImageIcon size={32} className="mx-auto block stroke-1 text-slate-600" />
+                          <p className="text-xs font-bold text-slate-400">Soal ini belum bersenjatakan gambar ilustrasi</p>
+                          <p className="text-[10px] text-slate-550">Anda dapat menyusun gambar baru menggunakan kecerdasan buatan AI atau mengunggah manual.</p>
                         </div>
                       )}
                     </div>
@@ -2915,23 +2916,23 @@ INSTRUKSI DESAIN SVG:
 
                   {/* WORD-STYLE SIZING PANEL */}
                   {(editingQuestion.svgContent || editingQuestion.imageUrl) && (
-                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3.5">
-                      <div className="flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
+                    <div className="p-4 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-3.5">
+                      <div className="flex items-center gap-1.5 border-b border-slate-800 pb-1.5 text-amber-500">
                         <span className="text-xs">📏</span>
-                        <h4 className="text-xs font-extrabold text-slate-800">Atur Ukuran Gambar (Gaya Microsoft Word)</h4>
+                        <h4 className="text-xs font-extrabold">Atur Ukuran Gambar (Gaya Microsoft Word)</h4>
                       </div>
 
                       {/* Presets Row */}
                       <div>
-                        <span className="text-[10px] font-bold text-slate-500 block mb-1.5">Pilih Ukuran Cepat:</span>
+                        <span className="text-[10px] font-bold text-slate-450 block mb-1.5">Pilih Ukuran Cepat:</span>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <button
                             type="button"
                             onClick={() => setEditingQuestion({ ...editingQuestion, imageWidth: 120, imageHeight: 80 })}
                             className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
                               (editingQuestion.imageWidth === 120 && editingQuestion.imageHeight === 80)
-                                ? "bg-indigo-600 border-indigo-600 text-white"
-                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                                ? "bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 border-transparent"
+                                : "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800"
                             }`}
                           >
                             🔎 Kecil (120×80)
@@ -2941,8 +2942,8 @@ INSTRUKSI DESAIN SVG:
                             onClick={() => setEditingQuestion({ ...editingQuestion, imageWidth: 240, imageHeight: 140 })}
                             className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
                               (!editingQuestion.imageWidth || (editingQuestion.imageWidth === 240 && editingQuestion.imageHeight === 140))
-                                ? "bg-indigo-600 border-indigo-600 text-white"
-                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                                ? "bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 border-transparent"
+                                : "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800"
                             }`}
                           >
                             ⚖️ Sedang (240×140)
@@ -2952,8 +2953,8 @@ INSTRUKSI DESAIN SVG:
                             onClick={() => setEditingQuestion({ ...editingQuestion, imageWidth: 360, imageHeight: 200 })}
                             className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
                               (editingQuestion.imageWidth === 360 && editingQuestion.imageHeight === 200)
-                                ? "bg-indigo-600 border-indigo-600 text-white"
-                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                                ? "bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 border-transparent"
+                                : "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800"
                             }`}
                           >
                             🖼️ Besar (360×200)
@@ -2963,8 +2964,8 @@ INSTRUKSI DESAIN SVG:
                             onClick={() => setEditingQuestion({ ...editingQuestion, imageWidth: 500, imageHeight: 280 })}
                             className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
                               (editingQuestion.imageWidth === 500 && editingQuestion.imageHeight === 280)
-                                ? "bg-indigo-600 border-indigo-600 text-white"
-                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                                ? "bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 border-transparent"
+                                : "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800"
                             }`}
                           >
                             🖥️ Luas (500×280)
@@ -2976,9 +2977,9 @@ INSTRUKSI DESAIN SVG:
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1.5">
                         {/* Width Slider (Panjang) */}
                         <div className="space-y-1">
-                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-600">
+                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
                             <span>↔️ Lebar (Panjang):</span>
-                            <span className="font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-sm">
+                            <span className="font-mono text-amber-450 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-sm">
                               {editingQuestion.imageWidth || 240}px
                             </span>
                           </div>
@@ -2992,16 +2993,16 @@ INSTRUKSI DESAIN SVG:
                               ...editingQuestion,
                               imageWidth: parseInt(e.target.value)
                             })}
-                            className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                            className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
                           />
-                          <p className="text-[9px] text-slate-400">Tarik slider untuk menambah/mengurangi lebar</p>
+                          <p className="text-[9px] text-slate-500">Tarik slider untuk menambah/mengurangi lebar</p>
                         </div>
 
                         {/* Height Slider (Tinggi) */}
                         <div className="space-y-1">
-                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-600">
+                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
                             <span>↕️ Tinggi Gambar:</span>
-                            <span className="font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-sm">
+                            <span className="font-mono text-amber-450 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-sm">
                               {editingQuestion.imageHeight || 140}px
                             </span>
                           </div>
@@ -3015,9 +3016,9 @@ INSTRUKSI DESAIN SVG:
                               ...editingQuestion,
                               imageHeight: parseInt(e.target.value)
                             })}
-                            className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                            className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
                           />
-                          <p className="text-[9px] text-slate-400">Tarik slider untuk menambah/mengurangi tinggi</p>
+                          <p className="text-[9px] text-slate-500">Tarik slider untuk menambah/mengurangi tinggi</p>
                         </div>
                       </div>
                     </div>
@@ -3025,19 +3026,19 @@ INSTRUKSI DESAIN SVG:
 
                   {/* ERROR REPORT BOX */}
                   {imageError && (
-                    <div className="p-3 bg-red-50 border border-red-150 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl flex items-center gap-2">
                       <span>⚠️</span>
                       <p className="font-semibold">{imageError}</p>
                     </div>
                   )}
 
                   {/* STEP 1: AI AUTO_GENERATION */}
-                  <div className="p-4 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border border-indigo-100 rounded-2xl space-y-2.5">
+                  <div className="p-4 bg-gradient-to-r from-amber-500/5 to-yellow-500/5 border border-amber-500/10 rounded-2xl space-y-2.5">
                     <div className="flex items-center gap-1.5">
-                      <Sparkles size={14} className="text-indigo-600 animate-pulse" />
-                      <h4 className="text-xs font-extrabold text-slate-800">🪄 Opsi Pintar: Hasilkan Gambar / Diagram Relevan dengan AI</h4>
+                      <Sparkles size={14} className="text-amber-500 animate-pulse" />
+                      <h4 className="text-xs font-extrabold text-amber-450">🪄 Opsi Pintar: Hasilkan Gambar / Diagram Relevan dengan AI (SVG)</h4>
                     </div>
-                    <p className="text-[11px] text-slate-500 leading-normal">
+                    <p className="text-[11px] text-slate-400 leading-normal">
                       Gemini AI akan secara otomatis membedah isi teks naskah pertanyaan di atas dan merekonstruksi 
                       kode XML SVG yang akurat (seperti pecahan pie, jaring jaring kubus, bagan sains, dsb) secara khusus.
                     </p>
@@ -3045,7 +3046,7 @@ INSTRUKSI DESAIN SVG:
                       type="button"
                       disabled={regeneratingImage}
                       onClick={handleRegenerateImageAI}
-                      className="px-4.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-extrabold text-xs rounded-xl inline-flex items-center gap-2 shadow-xs cursor-pointer select-none"
+                      className="px-4.5 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-xs rounded-xl inline-flex items-center gap-2 shadow-xs cursor-pointer select-none"
                     >
                       {regeneratingImage ? (
                         <>
@@ -3061,12 +3062,12 @@ INSTRUKSI DESAIN SVG:
                   </div>
 
                   {/* IMAGEN PHOTO PROMPT EDITOR SECTION */}
-                  <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-2.5">
+                  <div className="p-4 bg-slate-950/45 border border-slate-900 rounded-2xl space-y-2.5">
                     <div className="flex items-center gap-1.5">
                       <ImageIcon size={14} className="text-amber-500 shrink-0" />
-                      <h4 className="text-xs font-extrabold text-amber-900 select-none">📸 Prompt Foto Realistis (Imagen)</h4>
+                      <h4 className="text-xs font-extrabold text-amber-400 select-none">📸 Prompt Foto Realistis (Imagen)</h4>
                     </div>
-                    <p className="text-[11px] text-slate-650 leading-normal font-medium">
+                    <p className="text-[11px] text-slate-400 leading-normal font-medium">
                       Gunakan prompt ini dengan model Imagen untuk melahirkan visualisasi pendidikan Indonesia yang autentik dan ultra-realistis.
                     </p>
                     <textarea
@@ -3074,26 +3075,46 @@ INSTRUKSI DESAIN SVG:
                       value={editingQuestion.imagenPrompt || ""}
                       onChange={(e) => setEditingQuestion({ ...editingQuestion, imagenPrompt: e.target.value })}
                       placeholder="Prompt Imagen kosong untuk nomor ini. Klik 'Gen Standar Prompt' di bawah ini untuk merumuskannya secara otomatis berdasarkan soal ini."
-                      className="w-full text-[11px] font-mono p-2.5 bg-white border border-slate-200 rounded-xl outline-hidden text-slate-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-200 leading-relaxed"
+                      className="w-full text-[11px] font-mono p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl outline-hidden text-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 leading-relaxed"
                     />
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => {
                           const standardPrompt = `Ultra realistic educational photography of elementary school children in Indonesia, showing ${editingQuestion.questionType === "Pilihan Ganda" ? "answering questions about " + editingQuestion.materi : "observing realistic objects of " + editingQuestion.materi}, authentic Indonesian school environment, natural lighting, realistic environment, natural human pose, DSLR quality, highly detailed textures, realistic shadows, natural smiles, documentary style photography, depth of field, 8k detail. NEGATIVE PROMPT (DO NOT INCLUDE): NO TEXT, NO LETTERS, NO NUMBERS, NO WATERMARK, NO DISTORTION, NO CARTOON, NO WEIRD OBJECTS, NO EXTRA LIMBS.`;
                           setEditingQuestion({ ...editingQuestion, imagenPrompt: standardPrompt });
                         }}
-                        className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 cursor-pointer shadow-2xs"
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-lg text-[10px] font-bold text-slate-350 cursor-pointer shadow-2xs"
                       >
                         ⚡ Gen Standar Prompt
                       </button>
+
+                      <button
+                        type="button"
+                        disabled={generatingImagenSingle}
+                        onClick={handleGenerateImagenSingle}
+                        className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:from-amber-750 disabled:to-amber-800 text-slate-950 font-black rounded-lg text-[10px] cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                      >
+                        {generatingImagenSingle ? (
+                          <>
+                            <RefreshCw size={11} className="animate-spin" />
+                            Melukis Gambar...
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon size={11} />
+                            Hasilkan Gambar (AI)
+                          </>
+                        )}
+                      </button>
+
                       {editingQuestion.imagenPrompt && (
                         <button
                           type="button"
                           onClick={() => {
                             navigator.clipboard.writeText(editingQuestion.imagenPrompt || "");
                           }}
-                          className="px-3 py-1.5 bg-indigo-50 border border-indigo-150 text-indigo-700 rounded-lg text-[10px] font-bold cursor-pointer active:scale-95 transition-transform"
+                          className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg text-[10px] font-bold cursor-pointer active:scale-95 transition-transform"
                         >
                           ✔ Tersalin ke Clipboard
                         </button>
@@ -3102,25 +3123,25 @@ INSTRUKSI DESAIN SVG:
                   </div>
 
                   {/* STEP 2: MANUAL SOURCE INPUT */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-900">
                     {/* Method A: File Upload */}
                     <div className="space-y-2">
-                      <label className="text-[11px] font-extrabold text-slate-700 block select-none">
+                      <label className="text-[11px] font-extrabold text-slate-400 block select-none">
                         Option A: Unggah Gambar Mandiri (.png, .jpg / maks 2MB)
                       </label>
-                      <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <div className="flex items-center gap-2 bg-slate-955 p-2.5 rounded-xl border border-slate-800">
                         <input
                           type="file"
                           accept="image/*"
                           onChange={handleLocalImageUpload}
-                          className="block w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer"
+                          className="block w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-slate-900 file:text-slate-350 hover:file:bg-slate-800 cursor-pointer"
                         />
                       </div>
                     </div>
 
                     {/* Method B: URL input */}
                     <div className="space-y-1">
-                      <label className="text-[11px] font-extrabold text-slate-700 block select-none">
+                      <label className="text-[11px] font-extrabold text-slate-400 block select-none">
                         Option B: Tempel Link / URL Gambar Online
                       </label>
                       <input
@@ -3132,15 +3153,15 @@ INSTRUKSI DESAIN SVG:
                           imageUrl: e.target.value,
                           svgContent: undefined // clear SVG
                         })}
-                        className="w-full text-xs font-semibold p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-400"
+                        className="w-full text-xs font-semibold p-2.5 bg-slate-950 border border-slate-800 outline-hidden focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 text-slate-200"
                       />
                     </div>
                   </div>
 
                   {/* SVG Code direct input (Advanced) */}
-                  <div className="pt-2 border-t border-slate-100">
+                  <div className="pt-2 border-t border-slate-900">
                     <details className="group">
-                      <summary className="text-[11px] text-slate-400 hover:text-indigo-600 font-bold cursor-pointer select-none outline-hidden">
+                      <summary className="text-[11px] text-slate-500 hover:text-amber-500 font-bold cursor-pointer select-none outline-hidden">
                         ⚙️ Opsi Lanjutan: Sunting Markup XML SVG Langsung
                       </summary>
                       <div className="mt-2">
@@ -3153,7 +3174,7 @@ INSTRUKSI DESAIN SVG:
                             imageUrl: undefined
                           })}
                           placeholder="<svg viewBox='0 0 100 100'>...</svg>"
-                          className="w-full text-[10px] font-mono p-2.5 bg-slate-900 text-emerald-400 rounded-xl outline-hidden focus:ring-1 focus:ring-emerald-500/50"
+                          className="w-full text-[10px] font-mono p-2.5 bg-slate-955 text-emerald-400 border border-slate-850 rounded-xl outline-hidden focus:ring-1 focus:ring-emerald-500/30"
                         />
                       </div>
                     </details>
@@ -3165,22 +3186,22 @@ INSTRUKSI DESAIN SVG:
             </div>
 
             {/* Modal Footer Controls */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
-              <span className="text-[10px] text-slate-400 font-light hidden sm:inline">
+            <div className="p-4 bg-slate-950/60 border-t border-slate-900/80 flex items-center justify-between gap-3">
+              <span className="text-[10px] text-slate-500 font-light hidden sm:inline">
                 *Tinggi visual SVG otomatis menyesuaikan cetakan kertas dokumen ujian.
               </span>
               <div className="flex items-center gap-3 ml-auto">
                 <button
                   type="button"
                   onClick={() => setEditingQuestion(null)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 bg-white hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold text-slate-350 bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveModal}
-                  className="px-5 py-2 text-xs font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs rounded-xl transition-colors cursor-pointer"
+                  className="px-5 py-2 text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 shadow-md shadow-amber-500/10 rounded-xl transition-colors cursor-pointer"
                 >
                   Simpan Perubahan
                 </button>

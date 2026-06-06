@@ -140,7 +140,7 @@ export default function QuestionWithImage({ q, subject, onUpdateQuestion, disabl
 
   return (
     <div 
-      className="question-illustration print-avoid-break group relative my-5 mx-auto bg-slate-50 border-2 border-slate-300 border-dashed rounded-2xl flex flex-col items-center justify-center overflow-hidden transition-all duration-300 hover:border-blue-500 hover:bg-blue-50/10"
+      className="question-illustration print-avoid-break group relative my-5 ml-0 mr-auto bg-slate-50 border-2 border-slate-300 border-dashed rounded-2xl flex flex-col items-center justify-center overflow-hidden transition-all duration-300 hover:border-blue-500 hover:bg-blue-50/10"
       style={{
         width: `${imageWidth}px`,
         height: `${imageHeight}px`,

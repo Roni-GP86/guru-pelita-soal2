@@ -17,6 +17,8 @@ export interface SchoolInfo {
   educationDepartment?: string;
   documentPlace?: string;
   documentDate?: string;
+  showLogoKabupaten?: boolean;
+  showLogoSekolah?: boolean;
 }
 
 export type SubjectType =

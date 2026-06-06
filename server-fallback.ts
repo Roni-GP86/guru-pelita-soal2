@@ -842,6 +842,429 @@ export function generateFallbackKisiKisi(schoolInfo: any, subject: string, selec
   return rows;
 }
 
+export function getComplexAndMatchingContent(subject: string, topic: string, num: number, stim: string, qtext: string, opts: string[], key: string, expl: string, schoolInfo?: any) {
+  const topicLower = topic.toLowerCase();
+  const subLower = subject.toLowerCase();
+
+  let finalOptions = [
+    `Pernyataan A mengenai ${topic} yang benar`,
+    `Pernyataan B terkait penerapan ${topic}`,
+    `Pernyataan C tentang pemahaman ${topic}`,
+    `Pernyataan D mengenai materi ${topic}`
+  ];
+  let finalPairs = [
+    { question: `Pernyataan 1 tentang ${topic}`, answer: `Jawaban A` },
+    { question: `Pernyataan 2 tentang ${topic}`, answer: `Jawaban B` },
+    { question: `Pernyataan 3 tentang ${topic}`, answer: `Jawaban C` }
+  ];
+  let answerKeyPGK = "A, C";
+
+  if (subLower.includes("matematika")) {
+    if (topicLower.includes("cacah") || topicLower.includes("bilangan") || topicLower.includes("nilai tempat")) {
+      const isLarge = stim.includes("4.250");
+      if (isLarge) {
+        finalOptions = [
+          "Angka 4 menempati nilai tempat ribuan dengan nilai 4.000",
+          "Angka 2 menempati nilai tempat ratusan dengan nilai 200",
+          "Angka 5 menempati nilai tempat puluhan dengan nilai 50",
+          "Angka 0 menempati nilai tempat ratusan dengan nilai 100"
+        ];
+        answerKeyPGK = "A, B, C";
+        finalPairs = [
+          { question: "Angka 4", answer: "Nilai tempat Ribuan" },
+          { question: "Angka 2", answer: "Nilai tempat Ratusan" },
+          { question: "Angka 5", answer: "Nilai tempat Puluhan" }
+        ];
+      } else {
+        finalOptions = [
+          "Angka 4 menempati nilai tempat puluhan dengan nilai 40",
+          "Angka 2 menempati nilai tempat satuan dengan nilai 2",
+          "Bilangan 42 nilainya lebih besar dari 40",
+          "Angka 4 menempati nilai tempat satuan dengan nilai 4"
+        ];
+        answerKeyPGK = "A, B, C";
+        finalPairs = [
+          { question: "Angka 4", answer: "Nilai tempat Puluhan" },
+          { question: "Angka 2", answer: "Nilai tempat Satuan" },
+          { question: "Bilangan 42", answer: "Terdiri atas 4 puluhan dan 2 satuan" }
+        ];
+      }
+    } else if (topicLower.includes("kpk") || topicLower.includes("fpb") || topicLower.includes("pembagian") || topicLower.includes("perkalian")) {
+      finalOptions = [
+        "Mereka akan bertemu bersama kembali pada hari ke-12",
+        "Hari pertemuan bersama dicari menggunakan Kelipatan Persekutuan Terkecil (KPK)",
+        "KPK dari 4 dan 6 adalah 12",
+        "Mereka akan bertemu bersama kurang dari 10 hari lagi"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Kunjungan Evi", answer: "Setiap 4 hari sekali" },
+        { question: "Kunjungan Fandi", answer: "Setiap 6 hari sekali" },
+        { question: "Pertemuan bersama kembali", answer: "12 hari lagi" }
+      ];
+    } else if (topicLower.includes("luas") || topicLower.includes("persegi panjang") || topicLower.includes("keliling")) {
+      finalOptions = [
+        "Luas keseluruhan lapangan tersebut adalah 150 meter persegi",
+        "Bentuk lapangan olahraga sekolah tersebut adalah persegi panjang",
+        "Keliling lapangan tersebut adalah 50 meter",
+        "Luas lapangan tersebut lebih kecil dari 100 meter persegi"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Panjang lapangan", answer: "15 meter" },
+        { question: "Lebar lapangan", answer: "10 meter" },
+        { question: "Luas lapangan", answer: "150 meter persegi" }
+      ];
+    } else if (topicLower.includes("segitiga") || topicLower.includes("sudut") || topicLower.includes("geometri")) {
+      finalOptions = [
+        "Segitiga tersebut memiliki satu sudut yang besarnya tepat 90 derajat",
+        "Segitiga siku-siku memiliki sudut siku-siku sebesar 90 derajat",
+        "Jumlah sudut dalam bangun datar segitiga selalu 180 derajat",
+        "Segitiga tersebut tergolong sebagai segitiga sama sisi"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Sudut siku-siku", answer: "Besarnya tepat 90 derajat" },
+        { question: "Jumlah sudut segitiga", answer: "Totalnya 180 derajat" },
+        { question: "Nama bangun datar", answer: "Segitiga Siku-Siku" }
+      ];
+    } else if (topicLower.includes("pecahan")) {
+      finalOptions = [
+        "Pecahan 2/4 senilai dengan pecahan 1/2",
+        "Kue yang diterima Andi dapat digambarkan dengan mewarnai 2 bagian dari total 4 bagian lingkaran",
+        "Pecahan 2/4 nilainya lebih besar dari pecahan 3/4",
+        "Pecahan 2/4 memiliki pembilang 2 dan penyebut 4"
+      ];
+      answerKeyPGK = "A, B, D";
+      finalPairs = [
+        { question: "Pecahan 2/4", answer: "Senilai dengan 1/2" },
+        { question: "Pembilang pecahan 2/4", answer: "Angka 2" },
+        { question: "Penyebut pecahan 2/4", answer: "Angka 4" }
+      ];
+    } else {
+      finalOptions = [
+        "Jumlah seluruh pensil Evi sekarang adalah 7 buah",
+        "Pensil Evi berjumlah 3 buah lebih sedikit dari 10",
+        "Jumlah pensil Evi merupakan hasil penjumlahan 2 + 5",
+        "Total pensil Evi sekarang merupakan bilangan genap"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Pensil Evi semula", answer: "2 buah pensil" },
+        { question: "Pensil dari Fandi", answer: "5 buah pensil" },
+        { question: "Jumlah seluruh pensil", answer: "7 buah pensil" }
+      ];
+    }
+  } else if (subLower.includes("bahasa indonesia")) {
+    if (topicLower.includes("ejaan") || topicLower.includes("menulis") || topicLower.includes("eyd") || topicLower.includes("kapital")) {
+      finalOptions = [
+        "Nama diri orang (Andi) di awal kalimat wajib ditulis dengan huruf kapital",
+        "Huruf pertama unsur nama geografi (Desa Makmur) wajib menggunakan huruf kapital",
+        "Kata 'kemarin' dan 'sore' bukan nama diri sehingga ditulis dengan huruf kecil",
+        "Seluruh kata dalam kalimat wajib ditulis menggunakan huruf kapital semua"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Awal kalimat (Andi)", answer: "Wajib huruf kapital A" },
+        { question: "Nama geografi (Desa Makmur)", answer: "Huruf kapital pada D dan M" },
+        { question: "Kata umum (kemarin sore)", answer: "Menggunakan huruf kecil" }
+      ];
+    } else {
+      finalOptions = [
+        "Tokoh Roni rajin merawat koleksi buku miliknya",
+        "Roni membersihkan debu di sampul bukunya setiap hari Sabtu",
+        "Alat yang dipakai Roni untuk membersihkan debu adalah kemoceng bulu ayam",
+        "Roni menyimpan tumpukan bukunya di dalam kardus mainan secara acak"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Tokoh utama cerita", answer: "Roni" },
+        { question: "Waktu merawat buku", answer: "Setiap hari Sabtu" },
+        { question: "Alat yang digunakan", answer: "Kemoceng bulu ayam" }
+      ];
+    }
+  } else if (subLower.includes("pancasila")) {
+    if (topicLower.includes("simbol") || topicLower.includes("pancasila") || topicLower.includes("lambang")) {
+      finalOptions = [
+        "Sila kedua Pancasila disimbolkan dengan Rantai Emas",
+        "Sila ketiga Pancasila disimbolkan dengan Pohon Beringin",
+        "Sila kesatu Pancasila disimbolkan dengan Bintang Emas",
+        "Sila kelima Pancasila disimbolkan dengan Kepala Banteng"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Sila Kesatu", answer: "Bintang Emas" },
+        { question: "Sila Kedua", answer: "Rantai Emas" },
+        { question: "Sila Ketiga", answer: "Pohon Beringin" }
+      ];
+    } else {
+      finalOptions = [
+        "Piket kerja bakti membersihkan kelas mencerminkan gotong royong",
+        "Kerja bakti bersama teman-teman mencerminkan nilai Persatuan Indonesia",
+        "Saling menghargai di lingkungan sekolah menciptakan suasana rukun",
+        "Mencontek pekerjaan rumah teman mencerminkan pengamalan sila ketiga"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Kerja bakti kelas", answer: "Sila ketiga Pancasila" },
+        { question: "Menghargai teman", answer: "Kerukunan sekolah" },
+        { question: "Kerja sama", answer: "Gotong royong bersama" }
+      ];
+    }
+  } else if (subLower.includes("ipas") || subLower.includes("sains")) {
+    if (topicLower.includes("wujud") || topicLower.includes("zat") || topicLower.includes("suhu")) {
+      finalOptions = [
+        "Menguap merupakan perubahan wujud zat dari cair menjadi gas",
+        "Membeku merupakan perubahan wujud zat dari cair menjadi padat",
+        "Uap air mendidih merupakan wujud zat dalam bentuk gas",
+        "Perubahan wujud air mendidih menjadi gas disebut membeku"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Menguap", answer: "Perubahan wujud cair menjadi gas" },
+        { question: "Membeku", answer: "Perubahan wujud cair menjadi padat" },
+        { question: "Mengembun", answer: "Perubahan wujud gas menjadi cair" }
+      ];
+    } else if (topicLower.includes("tubuh") || topicLower.includes("fotosintesis") || topicLower.includes("organ")) {
+      finalOptions = [
+        "Akar tumbuhan berfungsi menyerap air dan unsur hara di dalam tanah",
+        "Daun tumbuhan merupakan tempat utama terjadinya proses fotosintesis",
+        "Batang tumbuhan menyalurkan air dari akar ke daun",
+        "Bunga tumbuhan menyerap air secara langsung dari dalam tanah"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Akar", answer: "Menyerap air dan zat hara" },
+        { question: "Daun", answer: "Tempat proses fotosintesis" },
+        { question: "Batang", answer: "Penyalur air ke seluruh tubuh" }
+      ];
+    } else {
+      finalOptions = [
+        "Tumbuhan hijau bertindak sebagai produsen yang menghasilkan makanan sendiri",
+        "Hewan pemakan tumbuhan (herbivora) bertindak sebagai konsumen tingkat satu",
+        "Fotosintesis memerlukan energi matahari untuk membuat zat makanan",
+        "Dekomposer memakan produsen secara langsung untuk membuat makanan"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Tumbuhan hijau", answer: "Produsen (pembuat makanan)" },
+        { question: "Hewan herbivora", answer: "Konsumen tingkat satu" },
+        { question: "Matahari", answer: "Sumber energi fotosintesis" }
+      ];
+    }
+  } else if (subLower.includes("pjok") || subLower.includes("jasmani") || subLower.includes("olahraga")) {
+    const isTemplate0 = stim.includes("non-lokomotor");
+    const isTemplate1 = stim.includes("kaki bagian dalam");
+    const isTemplate2 = stim.includes("menggiring bola");
+    const isTemplate3 = stim.includes("cium lutut");
+    const isTemplate4 = stim.includes("kasti");
+
+    if (isTemplate0) {
+      finalOptions = [
+        "Gerakan meliukkan badan merupakan contoh gerak non-lokomotor",
+        "Gerak non-lokomotor dilakukan di tempat tanpa memindahkan posisi kaki",
+        "Menekuk lutut tergolong ke dalam contoh gerak non-lokomotor",
+        "Berlari kencang memutari lapangan merupakan gerak non-lokomotor"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Meliukkan badan", answer: "Gerak non-lokomotor" },
+        { question: "Berlari kencang", answer: "Gerak lokomotor" },
+        { question: "Menendang bola", answer: "Gerak manipulatif" }
+      ];
+    } else if (isTemplate1) {
+      finalOptions = [
+        "Menendang bola dengan kaki bagian dalam bertujuan untuk operan pendek akurat",
+        "Kaki bagian dalam memiliki bidang sentuh yang lebar untuk akurasi operan",
+        "Mengoper bola melatih kerja sama regu dalam olahraga sepak bola",
+        "Kaki bagian dalam digunakan untuk tembakan keras melambung sejauh-jauhnya"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Kaki bagian dalam", answer: "Umpan pendek dan akurat" },
+        { question: "Punggung kaki", answer: "Tendangan keras ke gawang" },
+        { question: "Kerja sama tim", answer: "Tujuan mengoper bola" }
+      ];
+    } else if (isTemplate2) {
+      finalOptions = [
+        "Menggiring bola zig-zag melewati cone melatih kelincahan kaki",
+        "Keseimbangan tubuh membantu pergerakan lari melewati rintangan",
+        "Kontrol sentuhan kaki yang lembut menjaga bola tetap dekat",
+        "Bola harus ditendang sejauh-jauhnya agar tidak menyentuh cone"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Menggiring zig-zag", answer: "Melatih kelincahan" },
+        { question: "Rintangan cone", answer: "Mangkok olahraga orange" },
+        { question: "Kontrol kaki", answer: "Menjaga bola tetap dekat" }
+      ];
+    } else if (isTemplate3) {
+      finalOptions = [
+        "Latihan cium lutut meregangkan otot hamstring di paha belakang",
+        "Gerakan cium lutut melatih kelenturan persendian tulang belakang",
+        "Peregangan otot sebelum olahraga mengurangi risiko cedera",
+        "Lutut harus ditekuk setinggi dada saat melakukan cium lutut"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Latihan cium lutut", answer: "Melatih kelenturan" },
+        { question: "Otot hamstring", answer: "Otot paha bagian belakang" },
+        { question: "Manfaat peregangan", answer: "Mengurangi risiko cedera" }
+      ];
+    } else if (isTemplate4) {
+      finalOptions = [
+        "Memukul bola kasti tergolong ke dalam kelompok gerak manipulatif",
+        "Berlari ke tiang hinggap aman merupakan kelompok gerak lokomotor",
+        "Gerak manipulatif melibatkan penguasaan objek di luar tubuh",
+        "Melempar bola kasti merupakan contoh gerak non-lokomotor"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Memukul bola", answer: "Gerak manipulatif" },
+        { question: "Berlari ke tiang", answer: "Gerak lokomotor" },
+        { question: "Pemain kasti", answer: "Memukul dan berlari" }
+      ];
+    } else {
+      finalOptions = [
+        "Pemanasan melenturkan persendian and mempersiapkan otot tubuh",
+        "Pemanasan secara signifikan mengurangi risiko terjadinya cedera",
+        "Peregangan statis dan dinamis merupakan bagian dari pemanasan",
+        "Pemanasan sebaiknya dilakukan setelah seluruh olahraga selesai"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Peregangan otot", answer: "Pemanasan (warming up)" },
+        { question: "Manfaat pemanasan", answer: "Mencegah cedera olahraga" },
+        { question: "Olahraga utama", answer: "Aktivitas fisik intensitas tinggi" }
+      ];
+    }
+  } else if (subLower.includes("seni") || subLower.includes("rupa") || subLower.includes("musik") || subLower.includes("tari")) {
+    const isTemplate0 = stim.includes("cat warna");
+    const isTemplate1 = stim.includes("batik jumputan");
+    const isTemplate2 = stim.includes("tarian daerah");
+    const isTemplate3 = stim.includes("angklung");
+
+    if (isTemplate0) {
+      finalOptions = [
+        "Percampuran warna primer kuning dan biru menghasilkan warna sekunder hijau",
+        "Kuning dan biru merupakan contoh kelompok warna primer",
+        "Warna hijau dikelompokkan sebagai warna sekunder",
+        "Campuran warna merah dan kuning menghasilkan warna sekunder hijau"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Kuning dan Biru", answer: "Warna Primer" },
+        { question: "Warna Hijau", answer: "Warna Sekunder" },
+        { question: "Palet gambar", answer: "Wadah mencampur cat warna" }
+      ];
+    } else if (isTemplate1) {
+      finalOptions = [
+        "Daun suji menghasilkan warna hijau alami pada kerajinan kain",
+        "Kunyit merupakan contoh bahan pewarna kuning yang bersifat alami",
+        "Batik jumputan dirancang menggunakan teknik ikat celup",
+        "Pewarna kimia sintetis jauh lebih ramah lingkungan daripada kunyit"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Batik jumputan", answer: "Teknik ikat celup" },
+        { question: "Karet gelang", answer: "Bahan pengikat pola kain" },
+        { question: "Kunyit dan daun suji", answer: "Pewarna alami tumbuhan" }
+      ];
+    } else if (isTemplate2) {
+      finalOptions = [
+        "Gerak imitatif meniru secara langsung gerakan alam sekitar",
+        "Gerakan meniru daun bergoyang ditiup angin tergolong gerak imitatif",
+        "Tarian daerah menggambarkan ekspresi budaya lokal masyarakat",
+        "Gerak tari imitatif wajib menggunakan gerakan salto yang berbahaya"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Gerak imitatif", answer: "Meniru gerakan alam" },
+        { question: "Gamelan", answer: "Alat musik pengiring tari" },
+        { question: "Daun bergoyang", answer: "Stimulus gerak imitatif" }
+      ];
+    } else if (isTemplate3) {
+      finalOptions = [
+        "Angklung terbuat dari bahan bambu dan dimainkan secara ansambel",
+        "Alat musik angklung dimainkan dengan digoyangkan atau digetarkan",
+        "Angklung bambu merupakan alat musik tradisional dari Jawa Barat",
+        "Angklung dimainkan dengan cara ditiup bagian ujung bambunya"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Angklung", answer: "Alat musik bambu Jawa Barat" },
+        { question: "Teknik memainkan", answer: "Digoyangkan / digetarkan" },
+        { question: "Ansambel", answer: "Dimainkan bersama secara kelompok" }
+      ];
+    } else {
+      finalOptions = [
+        "Bidang terbentuk dari batasan ujung-ujung garis yang saling bertemu",
+        "Gambar dekoratif menggabungkan unsur garis, bidang/bentuk, dan warna",
+        "Warna kontras memperindah tampilan visual gambar dekoratif",
+        "Garis tidak memiliki fungsi dalam menyusun gambar dekoratif"
+      ];
+      answerKeyPGK = "A, B, C";
+      finalPairs = [
+        { question: "Unsur Bidang", answer: "Pertemuan ujung-ujung garis" },
+        { question: "Gambar dekoratif", answer: "Kombinasi garis, bidang, dan warna" },
+        { question: "Warna kontras", answer: "Memperindah visual gambar" }
+      ];
+    }
+  } else {
+    finalOptions = [
+      `Memahami materi ${topic} secara mendalam dengan tekun berlatih`,
+      `Menerapkan pemahaman ${topic} dalam kehidupan sehari-hari`,
+      `Mempelajari ${topic} memperluas wawasan dan kecakapan kita`,
+      `Menghafalkan ${topic} secara terpaksa tanpa memahami konsepnya`
+    ];
+    answerKeyPGK = "A, B, C";
+    finalPairs = [
+      { question: `Belajar ${topic}`, answer: "Memperluas wawasan diri" },
+      { question: `Penerapan ${topic}`, answer: "Berguna di kehidupan nyata" },
+      { question: `Evaluasi ${topic}`, answer: "Melihat capaian pemahaman" }
+    ];
+  }
+
+  // Dynamically vary the number of correct options (2, 3, or 4) based on question number 'num'
+  // to ensure variety across subjects, topics, and grades.
+  if (finalOptions && finalOptions.length === 4) {
+    const selector = num % 3;
+    if (selector === 0) {
+      // Case 2 correct:
+      if (answerKeyPGK === "A, B, D") {
+        const optB = finalOptions[1].trim();
+        finalOptions[1] = `Tidak benar bahwa ${optB.charAt(0).toLowerCase() + optB.slice(1)}`;
+        answerKeyPGK = "A, D";
+      } else if (answerKeyPGK === "A, B, C") {
+        const optB = finalOptions[1].trim();
+        finalOptions[1] = `Tidak benar bahwa ${optB.charAt(0).toLowerCase() + optB.slice(1)}`;
+        answerKeyPGK = "A, C";
+      }
+    } else if (selector === 2) {
+      // Case 4 correct (benar semua):
+      if (answerKeyPGK === "A, B, D") {
+        const optC = finalOptions[2].trim();
+        finalOptions[2] = `Tidak benar bahwa ${optC.charAt(0).toLowerCase() + optC.slice(1)}`;
+        answerKeyPGK = "A, B, C, D";
+      } else if (answerKeyPGK === "A, B, C") {
+        const optD = finalOptions[3].trim();
+        finalOptions[3] = `Tidak benar bahwa ${optD.charAt(0).toLowerCase() + optD.slice(1)}`;
+        answerKeyPGK = "A, B, C, D";
+      } else if (answerKeyPGK === "A, C") {
+        const optB = finalOptions[1].trim();
+        const optD = finalOptions[3].trim();
+        finalOptions[1] = `Tidak benar bahwa ${optB.charAt(0).toLowerCase() + optB.slice(1)}`;
+        finalOptions[3] = `Tidak benar bahwa ${optD.charAt(0).toLowerCase() + optD.slice(1)}`;
+        answerKeyPGK = "A, B, C, D";
+      } else {
+        answerKeyPGK = "A, B, C, D";
+      }
+    }
+  }
+
+  return { finalOptions, finalPairs, answerKeyPGK };
+}
+
 export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi: any[]) {
   const questions: any[] = [];
 
@@ -1283,21 +1706,11 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
         return `${String.fromCharCode(65 + idx)}. ${opt.replace(/^[A-D][.\s)]+/, "").trim()}`;
       });
       key = String.fromCharCode(97 + newCorrectIdx);
-    } else if (type === "Pilihan Ganda Kompleks") {
-      finalOptions = [
-        `Konsep A mengenai ${topic} yang dipelajari`,
-        `Kondisi B mengenai penerapan ${topic}`,
-        `Analisis C terkait pemahaman ${topic}`,
-        `Kesimpulan D mengenai materi ${topic}`
-      ];
-      key = "A, C";
-    } else if (type === "Menjodohkan") {
-      finalPairs = [
-        { question: `Konsep A dari ${topic}`, answer: "Jawaban A" },
-        { question: `Konsep B dari ${topic}`, answer: "Jawaban B" },
-        { question: `Konsep C dari ${topic}`, answer: "Jawaban C" },
-        { question: `Konsep D dari ${topic}`, answer: "Jawaban D" }
-      ];
+    } else if (type === "Pilihan Ganda Kompleks" || type === "Menjodohkan") {
+      const generated = getComplexAndMatchingContent(subject, topic, num, stim, qtext, opts, key, expl, schoolInfo);
+      finalOptions = generated.finalOptions;
+      finalPairs = generated.finalPairs;
+      key = generated.answerKeyPGK;
     }
 
     questions.push({
@@ -1309,7 +1722,7 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
       questionText: type === "Menjodohkan" && !qtext.includes("Jodohkan") ? "Jodohkanlah pernyataan di kolom kiri dengan jawaban di kolom kanan!" : qtext,
       options: finalOptions,
       pairs: finalPairs,
-      answerKey: type === "Pilihan Ganda" ? key : (type === "Pilihan Ganda Kompleks" ? "A, C" : "Sesuai pasangan yang benar"),
+      answerKey: type === "Pilihan Ganda" ? key : (type === "Pilihan Ganda Kompleks" ? key : "Sesuai pasangan yang benar"),
       alternativeAnswers: type === "Pilihan Ganda" ? [] : ["Alternatif jawaban logis sesuai kurikulum"],
       explanation: expl,
       svgContent: "",

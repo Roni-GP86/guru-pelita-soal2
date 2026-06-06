@@ -306,14 +306,32 @@ export default function SchoolProfileForm({
             
             {/* Panel 1: Logo Kabupaten (Kiri) */}
             <div className="space-y-2">
-              <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">1. Logo Kabupaten (Sisi Kiri Kop)</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">1. Logo Kabupaten (Sisi Kiri Kop)</span>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={schoolInfo.showLogoKabupaten !== false}
+                    onChange={(e) => {
+                      onChange({
+                        ...schoolInfo,
+                        showLogoKabupaten: e.target.checked
+                      });
+                    }}
+                    className="w-3.5 h-3.5 rounded bg-slate-900 border-slate-800 text-amber-500 focus:ring-0 cursor-pointer"
+                  />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    {schoolInfo.showLogoKabupaten !== false ? "🟢 Aktif" : "🔴 Nonaktif"}
+                  </span>
+                </label>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div
                   className={`flex flex-col items-center justify-center p-3 rounded-lg border text-center transition-all duration-300 relative overflow-hidden bg-slate-950/70 h-[92px] ${
                     schoolInfo.logoCustomData 
                       ? "border-amber-500/35 shadow-[0_4px_12px_rgba(245,158,11,0.04)]" 
                       : "border-slate-850 hover:border-slate-800/80"
-                  }`}
+                  } ${schoolInfo.showLogoKabupaten === false ? "opacity-45 grayscale" : ""}`}
                 >
                   {schoolInfo.logoCustomData ? (
                     <div className="relative group/logo">
@@ -364,14 +382,32 @@ export default function SchoolProfileForm({
 
             {/* Panel 2: Logo Sekolah (Kanan) */}
             <div className="space-y-2">
-              <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">2. Logo Sekolah (Sisi Kanan Kop)</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">2. Logo Sekolah (Sisi Kanan Kop)</span>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={schoolInfo.showLogoSekolah !== false}
+                    onChange={(e) => {
+                      onChange({
+                        ...schoolInfo,
+                        showLogoSekolah: e.target.checked
+                      });
+                    }}
+                    className="w-3.5 h-3.5 rounded bg-slate-900 border-slate-800 text-amber-500 focus:ring-0 cursor-pointer"
+                  />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    {schoolInfo.showLogoSekolah !== false ? "🟢 Aktif" : "🔴 Nonaktif"}
+                  </span>
+                </label>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div
                   className={`flex flex-col items-center justify-center p-3 rounded-lg border text-center transition-all duration-300 relative overflow-hidden bg-slate-950/70 h-[92px] ${
                     schoolInfo.logoSchoolCustomData 
                       ? "border-amber-500/35 shadow-[0_4px_12px_rgba(245,158,11,0.04)]" 
                       : "border-slate-850 hover:border-slate-800/80"
-                  }`}
+                  } ${schoolInfo.showLogoSekolah === false ? "opacity-45 grayscale" : ""}`}
                 >
                   {schoolInfo.logoSchoolCustomData ? (
                     <div className="relative group/logo">

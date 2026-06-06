@@ -3,7 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 
-import { FALLBACK_CURRICULUMS, generateFallbackKisiKisi, generateFallbackSoal } from "./server-fallback";
+import { FALLBACK_CURRICULUMS, generateFallbackKisiKisi, generateFallbackSoal, getComplexAndMatchingContent } from "./server-fallback";
 
 // Load environment variables
 dotenv.config();
@@ -1922,8 +1922,8 @@ app.post("/api/generate-soal", async (req, res) => {
       - JIKA SOAL MATEMATIKA (Pecahan/Geometri/Pengukuran) atau SAINS (Rantai makanan/Peta/Biologi): WAJIB ISI properti "svgContent" dengan XML SVG buatan tangan yang presisi, indah, dan mendidik.
       - JIKA SOAL LINGKUNGAN/SOSIAL/OLAHRAGA (Aktivitas Manusia/Alam/Olahraga): WAJIB KOSONGKAN "svgContent", TAPI ISI "imagePrompt" dan "imagenPrompt" dengan prompt deskripsi foto yang mendalam dalam Bahasa Inggris (Ultra realistic educational photography...). "visualAnalysis" WAJIB diisi.
       - JIKA SOAL BUKAN BERGAMBAR (TEKS MURNI): Kosongkan properti 'visualAnalysis', 'imagePrompt', 'imagenPrompt', 'imageUrl', dan 'svgContent'.
-      - JIKA TIPE "Pilihan Ganda Kompleks": Sediakan 4 "options" berupa pernyataan-pernyataan. Kunci jawaban "answerKey" berisi huruf jawaban benar yang dipisah koma (misal: "A, C").
-      - JIKA TIPE "Menjodohkan": Anda WAJIB mengisi properti "pairs" dengan 3-4 pasang { question: "...", answer: "..." }. "questionText" bisa diisi instruksi seperti "Jodohkanlah pernyataan di kolom kiri dengan jawaban yang tepat di kolom kanan!". "options" dikosongkan.
+      - JIKA TIPE "Pilihan Ganda Kompleks": Sediakan 4 "options" berupa pernyataan-pernyataan yang nyata, kontekstual, menarik, dan berlandaskan materi ujian. DILARANG KERAS menggunakan kata "Konsep", "Pernyataan", "Placeholder", "Pernyataan A/B/C/D", atau teks umum kosong/sementara! Setiap opsi harus berupa pernyataan konkret yang siap dinilai benar atau salah oleh siswa SD (contoh: "Matahari merupakan sumber energi terbarukan"). Kunci jawaban "answerKey" berisi huruf jawaban benar yang dipisah koma (misal: "A, C").
+      - JIKA TIPE "Menjodohkan": Anda WAJIB mengisi properti "pairs" dengan 3-4 pasang { question: "...", answer: "..." } yang nyata dan kontekstual. DILARANG KERAS menggunakan kata "Konsep", "Pernyataan", "Pasangan", "Jawaban A/B/C/D", atau placeholders! Kedua kolom (kiri/kanan) harus berisi data konkret (misal: question "Diponegoro" dan answer "Jawa Tengah"). "questionText" bisa diisi instruksi seperti "Jodohkanlah pernyataan di kolom kiri dengan jawaban yang tepat di kolom kanan!". "options" dikosongkan.
 
       ==================================================================
       ATURAN ANTI-REDUNDANSI & DUPLIKASI STIMULUS (SANGAT KETAT):
@@ -2088,38 +2088,101 @@ app.post("/api/generate-soal", async (req, res) => {
     const normalizedData = data.map((q: any) => {
       const promptStr = q.imagePrompt || q.imagenPrompt || "";
       if (q.questionType === "Pilihan Ganda Kompleks") {
-        if (!q.options || q.options.length < 4) {
-          q.options = [
-            `Pernyataan 1 tentang ${q.materi || 'materi ini'}`,
-            `Pernyataan 2 tentang ${q.materi || 'materi ini'}`,
-            `Pernyataan 3 tentang ${q.materi || 'materi ini'}`,
-            `Pernyataan 4 tentang ${q.materi || 'materi ini'}`
-          ];
+        const hasStaticPlaceholder = !q.options || q.options.length < 4 || q.options.some((o: string) => {
+          const lower = (o || "").toLowerCase();
+          return lower.includes("pernyataan") || lower.includes("konsep") || lower.includes("placeholder");
+        });
+        if (hasStaticPlaceholder) {
+          const generated = getComplexAndMatchingContent(
+            subject,
+            q.materi || "",
+            q.number || 1,
+            q.stimulusText || "",
+            q.questionText || "",
+            q.options || [],
+            q.answerKey || "",
+            q.explanation || "",
+            schoolInfo
+          );
+          if (generated.finalOptions && generated.finalOptions.length > 0) {
+            q.options = generated.finalOptions;
+          }
+          if (generated.answerKeyPGK) {
+            q.answerKey = generated.answerKeyPGK;
+          }
+        } else {
+          // Validate and normalize PGK answer key
+          let pgkKey = (q.answerKey || "").trim();
+          if (!pgkKey || !pgkKey.includes(",")) {
+            const allOpts = ["A", "B", "C", "D"];
+            const shuffledPGK = [...allOpts].sort(() => Math.random() - 0.5);
+            pgkKey = `${shuffledPGK[0]}, ${shuffledPGK[1]}`;
+          }
+          q.answerKey = pgkKey;
         }
-        // Validate and normalize PGK answer key (must contain 2+ comma-separated letters)
-        let pgkKey = (q.answerKey || "").trim();
-        if (!pgkKey || !pgkKey.includes(",")) {
-          // Generate a valid random 2-option answer key
-          const allOpts = ["A", "B", "C", "D"];
-          const shuffledPGK = [...allOpts].sort(() => Math.random() - 0.5);
-          pgkKey = `${shuffledPGK[0]}, ${shuffledPGK[1]}`;
+
+        // Shuffle the options and key to prevent repeating "1, 2, 3" pattern
+        if (q.options && q.options.length > 0 && q.answerKey) {
+          const correctLetters = q.answerKey.toUpperCase().split(/[,;]/).map((k: string) => k.trim());
+          const correctTexts = correctLetters.map((letter: string) => {
+            const idx = letter.charCodeAt(0) - 65;
+            if (idx >= 0 && idx < q.options!.length) {
+              return q.options![idx].replace(/^[A-E]\.\s*/, "").trim();
+            }
+            return "";
+          }).filter(Boolean);
+
+          const rawOptions = q.options.map((opt: string) => opt.replace(/^[A-E]\.\s*/, "").trim());
+          
+          const shuffledRaw = [...rawOptions];
+          for (let i = shuffledRaw.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledRaw[i], shuffledRaw[j]] = [shuffledRaw[j], shuffledRaw[i]];
+          }
+
+          const newCorrectLetters: string[] = [];
+          const newOptions = shuffledRaw.map((opt: string, idx: number) => {
+            const letter = String.fromCharCode(65 + idx);
+            if (correctTexts.includes(opt)) {
+              newCorrectLetters.push(letter);
+            }
+            return `${letter}. ${opt}`;
+          });
+
+          q.options = newOptions;
+          q.answerKey = newCorrectLetters.sort().join(",");
         }
-        return { ...q, answerKey: pgkKey, imagePrompt: "", imagenPrompt: "", imageUrl: "", svgContent: "" };
+
+        return { ...q, imagePrompt: "", imagenPrompt: "", imageUrl: "", svgContent: "", materi: cleanMateriInServer(q.materi || "") };
       }
 
       if (q.questionType === "Menjodohkan") {
-        if (!q.pairs || q.pairs.length < 3) {
-          q.pairs = [
-            { question: `Konsep A (${q.materi || 'Materi'})`, answer: "Pasangan A" },
-            { question: `Konsep B (${q.materi || 'Materi'})`, answer: "Pasangan B" },
-            { question: `Konsep C (${q.materi || 'Materi'})`, answer: "Pasangan C" }
-          ];
+        const hasStaticPlaceholder = !q.pairs || q.pairs.length < 3 || q.pairs.some((p: any) => {
+          const ql = (p.question || "").toLowerCase();
+          const al = (p.answer || "").toLowerCase();
+          return ql.includes("konsep") || ql.includes("pernyataan") || ql.includes("placeholder") ||
+                 al.includes("konsep") || al.includes("pernyataan") || al.includes("placeholder");
+        });
+        if (hasStaticPlaceholder) {
+          const generated = getComplexAndMatchingContent(
+            subject,
+            q.materi || "",
+            q.number || 1,
+            q.stimulusText || "",
+            q.questionText || "",
+            [],
+            q.answerKey || "",
+            q.explanation || "",
+            schoolInfo
+          );
+          if (generated.finalPairs && generated.finalPairs.length > 0) {
+            q.pairs = generated.finalPairs;
+          }
         }
-        // Ensure questionText has a matching instruction
         if (!q.questionText || !q.questionText.toLowerCase().includes("jodoh")) {
           q.questionText = "Jodohkanlah pernyataan di kolom kiri dengan jawaban yang tepat di kolom kanan!";
         }
-        return { ...q, options: [], answerKey: "Lihat pairs", imagePrompt: "", imagenPrompt: "", imageUrl: "", svgContent: "" };
+        return { ...q, options: [], answerKey: "Lihat pairs", imagePrompt: "", imagenPrompt: "", imageUrl: "", svgContent: "", materi: cleanMateriInServer(q.materi || "") };
       }
 
       if (q.questionType !== "Pilihan Ganda") {

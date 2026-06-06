@@ -371,8 +371,8 @@ export default function KisiKisiView({
 
   const leftLogo = getLogoKabupatenUrl(schoolInfo);
   const rightLogo = getLogoSekolahUrl(schoolInfo);
-  const hasLeft = !!leftLogo;
-  const hasRight = !!rightLogo;
+  const hasLeft = !!leftLogo && (schoolInfo.showLogoKabupaten !== false);
+  const hasRight = !!rightLogo && (schoolInfo.showLogoSekolah !== false);
 
   let leftWidth = "0%";
   let centerWidth = "100%";
@@ -607,67 +607,27 @@ export default function KisiKisiView({
     setDownloadingPdf(true);
     await new Promise((resolve) => setTimeout(resolve, 800));
     try {
-      const printStyleId = "pelita-kisi-print-style";
-      let printStyle = document.getElementById(printStyleId) as HTMLStyleElement | null;
-      if (!printStyle) {
-        printStyle = document.createElement("style");
-        printStyle.id = printStyleId;
-        document.head.appendChild(printStyle);
-      }
+      await withPdfStylesPatch(async () => {
+        const html2pdf = await getHtml2Pdf();
+        const element = printAreaRef.current;
+        if (!element) return;
 
-      printStyle.innerHTML = `
-        @media print {
-          @page {
-            size: A4 landscape;
-            margin: 15mm 15mm 15mm 15mm;
-          }
-          body > * { display: none !important; }
-          #kisi-kisi-print-area,
-          #kisi-kisi-print-area * {
-            display: revert !important;
-            visibility: visible !important;
-          }
-          #kisi-kisi-print-area {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            box-shadow: none !important;
-            background: white !important;
-            font-family: "Times New Roman", Times, serif !important;
-            font-size: 10pt !important;
-            line-height: 1.5 !important;
-            color: #000000 !important;
-          }
-          button, .no-print, [data-no-export], .no-export, nav, header, aside {
-            display: none !important;
-          }
-          /* Rata kiri untuk isi dokumen */
-          p, div, td, li { 
-            text-align: left !important;
-          }
-          /* Rata tengah khusus KOP dan judul */
-          .kop, .kop *, .document-title, th, .text-center {
-            text-align: center !important;
-          }
-          table { page-break-inside: auto; }
-          tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-        }
-      `;
+        // Add class to apply PDF style properties
+        element.classList.add("pdf-export-mode-kisi");
 
-      window.print();
+        const opt = {
+          margin:       [10, 8, 10, 8],
+          filename:     `Kisi-Kisi_${subject.replace(/\s+/g, '_')}_${schoolInfo.gradeClass.replace(/\s+/g, '_')}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, logging: false },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        };
 
-      setTimeout(() => {
-        printStyle!.innerHTML = "";
-      }, 2000);
+        await html2pdf().set(opt).from(element).save();
 
+        // Restore styles
+        element.classList.remove("pdf-export-mode-kisi");
+      });
     } catch (err: any) {
       console.error("Gagal mencetak PDF Kisi-Kisi:", err);
     } finally {
@@ -838,9 +798,9 @@ export default function KisiKisiView({
             <style dangerouslySetInnerHTML={{ __html: `
               /* PDF Generation Mode styles to ensure high quality A4 landscape print layout */
               .pdf-export-mode-kisi {
-                width: 1050px !important;
-                max-width: 1050px !important;
-                min-width: 1050px !important;
+                width: 1000px !important;
+                max-width: 1000px !important;
+                min-width: 1000px !important;
                 padding: 0 !important;
                 margin: 0 !important;
                 box-shadow: none !important;
@@ -862,6 +822,12 @@ export default function KisiKisiView({
               .pdf-export-mode-kisi .text-center,
               .pdf-export-mode-kisi [style*="text-align: center"] {
                 text-align: center !important;
+              }
+              .pdf-export-mode-kisi .no-print,
+              .pdf-export-mode-kisi .no-export,
+              .pdf-export-mode-kisi button,
+              .pdf-export-mode-kisi [data-no-export] {
+                display: none !important;
               }
             `}} />
             {/* Kop Resmi Dinamis */}
