@@ -1,9 +1,10 @@
 {
-  "projectId": "remixed-project-id",
-  "appId": "remixed-app-id",
-  "apiKey": "remixed-api-key",
-  "authDomain": "remixed-auth-domain",
-  "storageBucket": "remixed-storage-bucket",
-  "messagingSenderId": "remixed-messaging-sender-id",
-  "measurementId": "remixed-measurement-id"
+  "apiKey": "AIzaSyCUxHlPukc96GB5IWgWTc7mOrvNjmkV5yY",
+  "authDomain": "pelita-soal.firebaseapp.com",
+  "databaseURL": "https://pelita-soal-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "projectId": "pelita-soal",
+  "storageBucket": "pelita-soal.firebasestorage.app",
+  "messagingSenderId": "1050402530710",
+  "appId": "1:1050402530710:web:218d56b4c29b76678ba9b7",
+  "measurementId": "G-EGXE5MTZC2"
 }

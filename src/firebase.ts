@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 
 // Initialize Firebase App
@@ -7,10 +7,13 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore with custom DB instance ID if it is provided and non-empty
 const config = firebaseConfig as any;
-export const db =
-  config.firestoreDatabaseId && config.firestoreDatabaseId.trim() !== ""
-    ? getFirestore(app, config.firestoreDatabaseId)
-    : getFirestore(app);
+const dbId = config.firestoreDatabaseId && config.firestoreDatabaseId.trim() !== "" ? config.firestoreDatabaseId : undefined;
+
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+}, dbId);
 
 // Custom Firestore Operation Types for audit logs
 export enum OperationType {

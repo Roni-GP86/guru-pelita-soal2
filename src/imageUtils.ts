@@ -183,6 +183,19 @@ export function getRelevantVerifiedUnsplashUrl(
     /\bberpapasan\b/i.test(textToScan) ||
     /\bkoridor\b/i.test(textToScan) || 
     /\bberbincang\b/i.test(textToScan) ||
+    /\bteman\b/i.test(textToScan) ||
+    /\bsahabat\b/i.test(textToScan) ||
+    /\bkawan\b/i.test(textToScan) ||
+    /\bkelas\b/i.test(textToScan) ||
+    /\bsekolah\b/i.test(textToScan) ||
+    /\banak\b/i.test(textToScan) ||
+    /\bsiswa\b/i.test(textToScan) ||
+    /\bmurid\b/i.test(textToScan) ||
+    /\bfisik\b/i.test(textToScan) ||
+    /\brambut\b/i.test(textToScan) ||
+    /\bkulit\b/i.test(textToScan) ||
+    /\btinggi\b/i.test(textToScan) ||
+    /\bbadan\b/i.test(textToScan) ||
     (/\bguru\b/i.test(textToScan) && (/\bmurid\b/i.test(textToScan) || /\bsiswa\b/i.test(textToScan) || /\banak\b/i.test(textToScan) || /\bandi\b/i.test(textToScan) || /\bbudi\b/i.test(textToScan) || /\bcici\b/i.test(textToScan) || /\bdedi\b/i.test(textToScan)))
   ) {
     return VERIFIED_UNSPLASH_IMAGE_POOL.schoolInteraction;

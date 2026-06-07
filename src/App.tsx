@@ -207,6 +207,7 @@ export default function App() {
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [warningToast, setWarningToast] = useState<string | null>(null);
   const [isBannerDismissed, setIsBannerDismissed] = useState<boolean>(false);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<any | null>(null);
 
   const [userApiKey, setUserApiKey] = useState(() => {
     return localStorage.getItem("ttu_user_api_key") || "";
@@ -286,7 +287,55 @@ export default function App() {
     localStorage.setItem("ttu_code_requests", JSON.stringify(codeRequests));
   }, [codeRequests]);
 
-  // Syncing with Firestore in Real-Time
+  // One-time database seeding check to prevent empty Firestore from automatically re-seeding deleted records
+  useEffect(() => {
+    const checkAndSeedDb = async () => {
+      try {
+        const initDocRef = doc(db, "systemSettings", "dbSeeded");
+        const getDocsPromise = await getDocs(collection(db, "codeRequests"));
+        if (getDocsPromise.empty) {
+          // Double check to ensure we didn't seed already (for example, if DB was cleared by Admin)
+          const systemSettingsSnap = await getDocs(collection(db, "systemSettings"));
+          const alreadySeeded = systemSettingsSnap.docs.some(doc => doc.id === "dbSeeded");
+          if (!alreadySeeded) {
+            const seedList = [
+              {
+                id: "req-1",
+                schoolName: "SD Negeri Merdeka Pelosok",
+                teacherName: "Rani Handayani, S.Pd.",
+                role: "Guru Kelas",
+                subject: "Bahasa Inggris",
+                whatsappNumber: "082236015517",
+                uniqueCode: "GP-PS012R",
+                isActive: true,
+                timestamp: new Date(Date.now() - 3600000 * 4).toLocaleString("id-ID")
+              },
+              {
+                id: "req-2",
+                schoolName: "SD Katolik Santo Petrus",
+                teacherName: "Theresia Astuti, S.Pd.",
+                role: "Guru Mata Pelajaran",
+                subject: "Pendidikan Agama Katolik",
+                whatsappNumber: "081298765432",
+                uniqueCode: "GP-PS089A",
+                isActive: false,
+                timestamp: new Date(Date.now() - 3600000 * 24).toLocaleString("id-ID")
+              }
+            ];
+            for (const req of seedList) {
+              await setDoc(doc(db, "codeRequests", req.id), req);
+            }
+            await setDoc(initDocRef, { seededAt: new Date().toLocaleString("id-ID") });
+          }
+        }
+      } catch (err) {
+        console.warn("Firestore seeding check skipped (likely offline or permission restricted):", err);
+      }
+    };
+    checkAndSeedDb();
+  }, []);
+
+  // Syncing with Firestore in Real-Time (does not auto-seed, honoring permanent deletions)
   useEffect(() => {
     const unsubscribe = onSnapshot(
       collection(db, "codeRequests"),
@@ -296,48 +345,13 @@ export default function App() {
           list.push(doc.data());
         });
         
-        if (list.length > 0) {
-          // Sort list so that the newest additions are at the top
-          list.sort((a, b) => {
-            const timeA = a.id && a.id.startsWith("req-") ? Number(a.id.replace("req-", "")) : 0;
-            const timeB = b.id && b.id.startsWith("req-") ? Number(b.id.replace("req-", "")) : 0;
-            return timeB - timeA;
-          });
-          setCodeRequests(list);
-        } else {
-          // If Firestore is empty, let's migrate local ttu_code_requests or the default seed list to Firestore
-          const seedList = codeRequests.length > 0 ? codeRequests : [
-            {
-              id: "req-1",
-              schoolName: "SD Negeri Merdeka Pelosok",
-              teacherName: "Rani Handayani, S.Pd.",
-              role: "Guru Kelas",
-              subject: "Bahasa Inggris",
-              whatsappNumber: "082236015517",
-              uniqueCode: "GP-PS012R",
-              isActive: true,
-              timestamp: new Date(Date.now() - 3600000 * 4).toLocaleString("id-ID")
-            },
-            {
-              id: "req-2",
-              schoolName: "SD Katolik Santo Petrus",
-              teacherName: "Theresia Astuti, S.Pd.",
-              role: "Guru Mata Pelajaran",
-              subject: "Pendidikan Agama Katolik",
-              whatsappNumber: "081298765432",
-              uniqueCode: "GP-PS089A",
-              isActive: false,
-              timestamp: new Date(Date.now() - 3600000 * 24).toLocaleString("id-ID")
-            }
-          ];
-          for (const req of seedList) {
-            try {
-              await setDoc(doc(db, "codeRequests", req.id), req);
-            } catch (err) {
-              console.error("Error seeding codeRequests:", err);
-            }
-          }
-        }
+        // Sort list so that the newest additions are at the top
+        list.sort((a, b) => {
+          const timeA = a.id && a.id.startsWith("req-") ? Number(a.id.replace("req-", "")) : 0;
+          const timeB = b.id && b.id.startsWith("req-") ? Number(b.id.replace("req-", "")) : 0;
+          return timeB - timeA;
+        });
+        setCodeRequests(list);
       },
       (error) => {
         console.error("Firestore real-time subscription error:", error);
@@ -1742,21 +1756,8 @@ export default function App() {
                                     {/* Delete Request */}
                                     <button
                                       type="button"
-                                      onClick={async () => {
-                                        if (window.confirm(`Hapus request kode ${req.uniqueCode}?`)) {
-                                          // Optimistic update
-                                          setCodeRequests((prev) => prev.filter((r) => r.id !== req.id));
-                                          setSuccessToast("Data request terhapus.");
-                                          if (isThisReqActive) {
-                                            setActiveCode("");
-                                          }
-                                          
-                                          try {
-                                            await deleteDoc(doc(db, "codeRequests", req.id));
-                                          } catch (err) {
-                                            console.error("Gagal menghapus data di database:", err);
-                                          }
-                                        }
+                                      onClick={() => {
+                                        setDeleteConfirmTarget(req);
                                       }}
                                       className="py-1.5 px-2 hover:bg-rose-950 text-rose-450 hover:text-rose-300 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border border-slate-850"
                                       title="Hapus Data Ini"
@@ -2549,6 +2550,92 @@ export default function App() {
                 className="px-4 py-2.5 bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 text-white text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-md shadow-rose-950/20 active:scale-95 transition-all"
               >
                 Ya, Riset Sekarang!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM CONFIRMATION DELETE DIALOG WINDOW overlay */}
+      {deleteConfirmTarget && (
+        <div id="delete-confirm-modal" className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-rose-500/30 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden text-left animate-in zoom-in-95 duration-200">
+            {/* Red header strip */}
+            <div className="absolute top-0 left-0 right-0 h-[4px] bg-rose-600"></div>
+
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shadow-md">
+                <Trash size={24} className="stroke-[2.5]" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm text-slate-100 uppercase tracking-wider leading-none">
+                  Konfirmasi Hapus
+                </h3>
+                <p className="text-[10px] text-rose-400 font-extrabold mt-1.5 uppercase leading-none tracking-widest">
+                  Hapus Permanen Data Request
+                </p>
+              </div>
+            </div>
+
+            {/* Content body */}
+            <div className="space-y-3 mb-6">
+              <p className="text-slate-350 text-xs leading-relaxed font-bold">
+                Apakah Anda yakin ingin menghapus data request akses dan pesan dari sekolah ini secara permanen?
+              </p>
+              
+              <div className="bg-slate-950/60 border border-slate-850 p-4 rounded-xl space-y-2 text-xs font-semibold">
+                <div className="grid grid-cols-3 text-slate-500 font-bold uppercase tracking-wider text-[9px]">
+                  <span className="col-span-1">Guru</span>
+                  <span className="col-span-2 text-slate-200">{deleteConfirmTarget.teacherName}</span>
+                </div>
+                <div className="grid grid-cols-3 text-slate-500 font-bold uppercase tracking-wider text-[9px] border-t border-slate-900 pt-1.5">
+                  <span className="col-span-1">Sekolah</span>
+                  <span className="col-span-2 text-slate-200">{deleteConfirmTarget.schoolName}</span>
+                </div>
+                <div className="grid grid-cols-3 text-slate-500 font-bold uppercase tracking-wider text-[9px] border-t border-slate-900 pt-1.5">
+                  <span className="col-span-1">Kode Akses</span>
+                  <span className="col-span-2 text-purple-400 font-mono font-black tracking-widest">{deleteConfirmTarget.uniqueCode}</span>
+                </div>
+              </div>
+
+              <p className="text-[10.5px] text-rose-400 font-bold italic leading-normal">
+                ⚠️ Tindakan ini akan menghapus data dari Cloud Database Firestore & Penyimpanan Lokal. Data tidak dapat dipulihkan kembali!
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 border-t border-slate-850 pt-4">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmTarget(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+              >
+                Batalkan
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const target = deleteConfirmTarget;
+                  setDeleteConfirmTarget(null);
+
+                  // Optimistic update
+                  setCodeRequests((prev) => prev.filter((r) => r.id !== target.id));
+                  setSuccessToast("Data request terhapus secara permanen.");
+                  if (activeCode.trim().toUpperCase() === target.uniqueCode.trim().toUpperCase()) {
+                    setActiveCode("");
+                  }
+
+                  try {
+                    await deleteDoc(doc(db, "codeRequests", target.id));
+                  } catch (err) {
+                    console.error("Gagal menghapus data di database:", err);
+                    setWarningToast("Gagal menghapus data di cloud database. Silakan coba lagi.");
+                  }
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-md shadow-rose-950/20 active:scale-95 transition-all"
+              >
+                Ya, Hapus Permanen!
               </button>
             </div>
           </div>
