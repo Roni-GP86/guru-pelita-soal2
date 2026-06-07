@@ -295,6 +295,24 @@ TUGAS UTAMA ANDA:
 Membuat soal PJOK SD Kelas 4 yang sangat presisi sesuai indikator kisi-kisi, dengan aturan ketat mengenai penggunaan gambar stimulus yang relevan dan akurat.`;
   }
 
+  const sharedSystemInstructionSuffix = `
+========================================================================
+ATURAN MUTLAK KOSAKATA, GAYA BAHASA & ANTI-REPETISI (SANGAT KETAT):
+1. HINDARI PENGGUNAAN KATA YANG REPETITIF:
+   - DILARANG menggunakan kata 'siswa' atau 'sekolah' secara berulang-ulang di setiap nomor soal.
+   - Gunakan variasi sebutan alternatif seperti: 'anak-anak', 'peserta didik', 'murid', 'teman sekelas', nama tokoh anak Indonesia yang bervariasi (seperti 'Wayan', 'Fatimah', 'Stefanus', 'Made', 'Siti', 'Yusuf', 'Maria', 'Dayu', 'Lani', 'Edo', 'Udin', 'Beni'), 'kakak', 'adik', atau 'anggota kelompok'.
+2. JANGAN GUNAKAN NAMA SEKOLAH ASLI DARI KONTEKS:
+   - SANGAT DILARANG menyebut nama sekolah asli (dari data profil sekolah) secara berulang kali di teks soal. Gunakan latar tempat fiktif yang bervariasi (taman bermain, lapangan, perpustakaan, kebun, pasar tradisional, lingkungan rumah, sawah, dsb) untuk menambah relevansi kontekstual soal.
+3. KHUSUS KELAS 1, 2, DAN 3 (FASE A):
+   - Gunakan kalimat yang SANGAT pendek, kosakata sederhana yang umum didengar anak kecil, langsung pada intinya (to-the-point), dan TIDAK BERTELE-TELE.
+   - HINDARI cerita pengantar atau stimulus panjang yang membingungkan atau melelahkan bagi anak usia dini yang baru belajar membaca.
+4. VARIATIF & UNIK ANTAR NOMOR:
+   - Skenario, tokoh, nama, angka, objek, waktu, dan kejadian WAJIB 100% berbeda dan unik antara soal nomor satu dengan nomor lainnya.
+========================================================================
+  `.trim();
+
+  systemInstruction += "\n\n" + sharedSystemInstructionSuffix;
+
   return { rules, systemInstruction };
 }
 

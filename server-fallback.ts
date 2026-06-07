@@ -1272,13 +1272,27 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
     ? "Fase A" 
     : ["Kelas 3", "Kelas 4"].includes(schoolInfo?.gradeClass) 
       ? "Fase B" 
-      : "Fase C";
-
-  const commonNames = {
-    guru: ["Pak Bambang", "Ibu Sri", "Pak Hartono", "Ibu Ratih", "Pak Joko", "Ibu Shinta"],
-    murid: ["Andi", "Budi", "Cici", "Dedi", "Evi", "Fandi", "Gita", "Hari", "Iwan", "Julia", "Rian", "Sari"],
-    desa: ["Desa Sukamaju", "Desa Makmur", "Kota Harapan", "Desa Subur"],
-    sekolah: ["SD Negeri Nusantara", "SD Merdeka", "SD Harapan Bangsa", "SD Bakti Luhur"]
+      : "Fase C";  const commonNames = {
+    guru: [
+      "Pak Wayan", "Ibu Fatimah", "Pak Stefanus", "Ibu Made", "Pak Yusuf", "Ibu Maria", 
+      "Pak Joko", "Ibu Shinta", "Pak Bambang", "Ibu Sri", "Pak Hartono", "Ibu Ratih",
+      "Pak RT Ahmad", "Pak Desa Tinus", "Bu Guru Yanti", "Pak Guru Anton"
+    ],
+    murid: [
+      "Tinus", "Ahmad", "Winda", "Yanti", "Ira", "Wayan", "Made", "Siti", "Yusuf", "Maria", 
+      "Dayu", "Lani", "Edo", "Udin", "Beni", "Anton", "Joni", "Roni", "Ghea", "Rani", 
+      "Andi", "Budi", "Cici", "Dedi", "Evi", "Fandi", "Gita", "Hari", "Iwan", "Julia"
+    ],
+    desa: ["Desa Fatubai", "Desa Sukamaju", "Desa Makmur", "Kota Kupang", "Desa Subur", "Desa Nifuboke"],
+    latar: [
+      "taman bermain", "lapangan olahraga", "perpustakaan", "kebun belakang sekolah", 
+      "sawah milik paman", "pantai berpasir", "ruang kelas", "pasar tradisional", 
+      "teras depan rumah", "jalan desa", "ruang musik", "halaman depan"
+    ],
+    sekolah: [
+      "SD Negeri Fatubai", "SD Inpres Nifuboke", "SD Katolik Santo Petrus", "SD Harapan Bangsa", 
+      "SD Tunas Bangsa", "SD Negeri Merdeka", "SD Jaya Raya", "SD Karya Bhakti"
+    ]
   };
 
   for (const row of kisiKisi) {
@@ -1289,10 +1303,11 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
 
     // Names instantiated stably based on question number so they don't shift randomly during re-renders
     const nameA = commonNames.murid[num % commonNames.murid.length];
-    const nameB = commonNames.murid[(num + 1) % commonNames.murid.length];
+    const nameB = commonNames.murid[(num + 5) % commonNames.murid.length];
     const nameGuru = commonNames.guru[num % commonNames.guru.length];
     const desa = commonNames.desa[num % commonNames.desa.length];
     const sekolah = commonNames.sekolah[num % commonNames.sekolah.length];
+    const latar = commonNames.latar[num % commonNames.latar.length];
 
     let sc = ""; // SVG Content
     let stim = ""; // Stimulus Text
@@ -1304,12 +1319,66 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
     // Specific deterministic templates based on subject and topic
     if (subject.includes("Matematika")) {
       if (topic.includes("Pecahan") || topic.includes("pecahan")) {
-        stim = `Di ${sekolah}, Ibu Guru ${nameGuru} membawa sebuah kue melon. Ibu memotong kue tersebut menjadi beberapa bagian sama besar untuk dibagikan kepada ${nameA} dan ${nameB}.`;
-        qtext = `${nameA} mendapatkan 2/4 bagian dari kue tersebut. Manakah di bawah ini pecahan yang senilai dengan kue yang diterima oleh ${nameA}?`;
-        opts = ["A. 1/2", "B. 1/3", "C. 2/3", "D. 3/8"];
-        key = "a";
-        expl = "Pecahan 2/4 jika disederhanakan dengan membagi pembilang dan penyebut dengan angka 2 akan menghasilkan 1/2. Maka 2/4 senilai dengan 1/2.";
-        
+        const pecTemplates = [
+          {
+            stimFaseA: `${nameA} punya 1 apel. Apel itu dipotong jadi 2 sama besar. 1 bagian dimakan.`,
+            qtextFaseA: `Berapa bagian apel yang dimakan oleh ${nameA}?`,
+            optsFaseA: ["A. 1/2 bagian", "B. 1/3 bagian", "C. 2/3 bagian", "D. 1/4 bagian"],
+            keyFaseA: "a",
+            explFaseA: "Apel dipotong 2 sama besar, 1 bagian nilainya setengah atau 1/2.",
+            
+            stimFaseBC: `Di ${sekolah}, Ibu Guru ${nameGuru} membawa kue melon. Kue dipotong menjadi 4 bagian sama besar untuk ${nameA} dan ${nameB}.`,
+            qtextFaseBC: `${nameA} menerima 2/4 bagian dari kue melon. Manakah pecahan di bawah yang senilai dengan bagian ${nameA}?`,
+            optsFaseBC: ["A. 1/2", "B. 1/3", "C. 2/3", "D. 3/8"],
+            keyFaseBC: "a",
+            explFaseBC: "Pecahan 2/4 disederhanakan dengan membagi pembilang dan penyebut dengan 2 menjadi 1/2."
+          },
+          {
+            stimFaseA: `${nameA} membagi kue cokelat menjadi 4 bagian sama besar. ${nameB} makan 2 potong.`,
+            qtextFaseA: `Pecahan yang menunjukkan kue cokelat yang dimakan ${nameB} adalah?`,
+            optsFaseA: ["A. 2/4", "B. 1/4", "C. 3/4", "D. 4/4"],
+            keyFaseA: "a",
+            explFaseA: "Makan 2 potong dari 4 potong sama besar berarti 2/4 bagian.",
+
+            stimFaseBC: `${nameA} memotong cokelat menjadi 8 bagian sama besar. Sebanyak 4 bagian diberikan kepada ${nameB}.`,
+            qtextFaseBC: `Manakah di bawah ini pecahan yang senilai dengan bagian cokelat yang diterima oleh ${nameB}?`,
+            optsFaseBC: ["A. 2/4", "B. 1/3", "C. 2/5", "D. 3/4"],
+            keyFaseBC: "a",
+            explFaseBC: "Cokelat yang diterima adalah 4/8, yang disederhanakan menjadi 1/2, setara dengan 2/4."
+          },
+          {
+            stimFaseA: `${nameA} membagi selembar kertas lipat menjadi 4 bagian. Kertas itu diwarnai merah sebanyak 3 bagian.`,
+            qtextFaseA: `Berapa bagian kertas lipat merah itu?`,
+            optsFaseA: ["A. 3/4", "B. 1/4", "C. 2/4", "D. 4/4"],
+            keyFaseA: "a",
+            explFaseA: "Mewarnai 3 bagian dari 4 bagian berarti 3/4.",
+
+            stimFaseBC: `${nameA} membawa martabak manis dan dipotong menjadi 6 bagian sama besar. Ia memakan 3/6 bagian martabak tersebut.`,
+            qtextFaseBC: `Manakah pecahan berikut yang senilai dengan martabak yang dimakan oleh ${nameA}?`,
+            optsFaseBC: ["A. 1/2", "B. 1/4", "C. 2/3", "D. 5/6"],
+            keyFaseBC: "a",
+            explFaseBC: "Pecahan 3/6 disederhanakan dengan membagi pembilang dan penyebut dengan 3 menjadi 1/2."
+          },
+          {
+            stimFaseA: `Ada 4 buah jeruk di meja. ${nameA} makan 1 buah jeruk itu.`,
+            qtextFaseA: `Berapa pecahan jeruk yang dimakan oleh ${nameA}?`,
+            optsFaseA: ["A. 1/4", "B. 2/4", "C. 3/4", "D. 4/4"],
+            keyFaseA: "a",
+            explFaseA: "Memakan 1 dari 4 jeruk berarti 1/4 bagian jeruk.",
+
+            stimFaseBC: `${nameA} membelah semangka menjadi 10 potong sama besar. Sebanyak 2/10 bagian dibagikan ke tetangga terdekat.`,
+            qtextFaseBC: `Pecahan manakah yang senilai dengan buah semangka yang dibagikan kepada tetangga tersebut?`,
+            optsFaseBC: ["A. 1/5", "B. 1/4", "C. 2/5", "D. 3/10"],
+            keyFaseBC: "a",
+            explFaseBC: "Pecahan 2/10 disederhanakan dengan membagi pembilang dan penyebut dengan 2 menjadi 1/5."
+          }
+        ];
+        const t = pecTemplates[num % pecTemplates.length];
+        if (currentPhase === "Fase A") {
+          stim = t.stimFaseA; qtext = t.qtextFaseA; opts = t.optsFaseA; key = t.keyFaseA; expl = t.explFaseA;
+        } else {
+          stim = t.stimFaseBC; qtext = t.qtextFaseBC; opts = t.optsFaseBC; key = t.keyFaseBC; expl = t.explFaseBC;
+        }
         sc = `<svg viewBox="0 0 120 120" style="max-width: 120px; display: block; margin: 10px auto;">
           <circle cx="60" cy="60" r="50" stroke="#334155" stroke-width="3" fill="none"/>
           <path d="M 60 10 A 50 50 0 0 1 110 60 A 50 50 0 0 1 60 110 L 60 60 Z" fill="#cbd5e1" stroke="#334155" stroke-width="2"/>
@@ -1317,36 +1386,144 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
           <line x1="10" y1="60" x2="110" y2="60" stroke="#334155" stroke-width="2"/>
           <text x="60" y="5" font-family="sans-serif" font-size="8" text-anchor="middle" font-weight="bold">Kue Melon</text>
         </svg>`;
-      } 
+      }
       else if (topic.includes("Cacah") || topic.includes("cacah") || topic.includes("Bilangan")) {
         if (currentPhase === "Fase A") {
-          stim = `Pak Guru ${nameGuru} di ${desa} sedang mengumpulkan pensil warna di kelas. Pak Guru mengumpulkan pensil warna sebanyak 42 buah.`;
-          qtext = "Pada bilangan 42, angka manakah yang menempati nilai tempat puluhan?";
-          opts = ["A. Angka 4", "B. Angka 2", "C. Angka 0", "D. Angka 10"];
-          key = "a";
-          expl = "Pada bilangan 42: angka 4 menempati nilai tempat puluhan (nilainya 40), sedangkan angka 2 menempati nilai tempat satuan. Jadi nilai puluhan ditempati oleh angka 4.";
+          const cacahTemplates = [
+            {
+              stim: `Di ${latar}, ${nameA} menghitung pensil warna miliknya. Ia memiliki pensil warna sebanyak 42 buah.`,
+              qtext: "Pada bilangan 42, angka manakah yang menempati nilai tempat puluhan?",
+              opts: ["A. Angka 4", "B. Angka 2", "C. Angka 0", "D. Angka 10"],
+              key: "a",
+              expl: "Pada bilangan 42, 4 menempati puluhan (40) dan 2 menempati satuan."
+            },
+            {
+              stim: `Di kelas, ${nameA} menyusun buku cerita. Jumlah buku cerita yang tersusun adalah 85 buah.`,
+              qtext: "Pada bilangan 85, angka manakah yang menempati nilai tempat satuan?",
+              opts: ["A. Angka 5", "B. Angka 8", "C. Angka 0", "D. Angka 80"],
+              key: "a",
+              expl: "Pada bilangan 85, 8 menempati puluhan (80) dan 5 menempati satuan."
+            },
+            {
+              stim: `${nameA} mengumpulkan mainan di halaman rumah. Terkumpul kelereng sebanyak 67 butir.`,
+              qtext: "Pada bilangan 67, angka manakah yang menempati nilai tempat puluhan?",
+              opts: ["A. Angka 6", "B. Angka 7", "C. Angka 10", "D. Angka 60"],
+              key: "a",
+              expl: "Pada bilangan 67, 6 menempati puluhan (60) dan 7 menempati satuan."
+            },
+            {
+              stim: `Di perpustakaan, ${nameA} meminjam buku. Nomor antrean kartu perpustakaannya adalah 19.`,
+              qtext: "Pada bilangan 19, angka manakah yang menempati nilai tempat satuan?",
+              opts: ["A. Angka 9", "B. Angka 1", "C. Angka 10", "D. Angka 90"],
+              key: "a",
+              expl: "Pada bilangan 19, 1 menempati puluhan (10) dan 9 menempati satuan."
+            }
+          ];
+          const t = cacahTemplates[num % cacahTemplates.length];
+          stim = t.stim; qtext = t.qtext; opts = t.opts; key = t.key; expl = t.expl;
         } else {
-          stim = `Pak Guru ${nameGuru} di ${desa} sedang mendata sisa buku tulis perpustakaan. Lemari perpustakaan mengumpulkan buku dan berhasil menyusun sebanyak 4.250 buah buku pelajaran.`;
-          qtext = "Pada bilangan 4.250, manakah angka yang menempati nilai tempat ratusan?";
-          opts = ["A. Angka 4", "B. Angka 2", "C. Angka 5", "D. Angka 0"];
-          key = "b";
-          expl = "Pada bilangan 4.250: 4 menempati ribuan, 2 menempati ratusan, 5 menempati puluhan, dan 0 menempati satuan. Jadi ratusan ditempati oleh angka 2.";
+          const cacahTemplates = [
+            {
+              stim: `Pak Guru ${nameGuru} di ${desa} sedang mendata sisa buku tulis perpustakaan. Buku tersusun sebanyak 4.250 buah.`,
+              qtext: "Pada bilangan 4.250, manakah angka yang menempati nilai tempat ratusan?",
+              opts: ["A. Angka 4", "B. Angka 2", "C. Angka 5", "D. Angka 0"],
+              key: "b",
+              expl: "Pada bilangan 4.250, ratusan ditempati oleh angka 2 (nilainya 200)."
+            },
+            {
+              stim: `Nelayan di dekat ${desa} mengumpulkan hasil tangkapan ikan asin kering sebanyak 8.761 kemasan kantong plastik.`,
+              qtext: "Pada bilangan 8.761, manakah angka yang menempati nilai tempat ribuan?",
+              opts: ["A. Angka 8", "B. Angka 7", "C. Angka 6", "D. Angka 1"],
+              key: "a",
+              expl: "Pada bilangan 8.761, ribuan ditempati oleh angka 8 (nilainya 8.000)."
+            },
+            {
+              stim: `Petugas pos di ${sekolah} mencatat surat yang dikirim. Nomor registrasi yang tercatat adalah 5.039.`,
+              qtext: "Pada bilangan 5.039, manakah angka yang menempati nilai tempat puluhan?",
+              opts: ["A. Angka 3", "B. Angka 5", "C. Angka 0", "D. Angka 9"],
+              key: "a",
+              expl: "Pada bilangan 5.039, puluhan ditempati oleh angka 3 (nilainya 30)."
+            },
+            {
+              stim: `Koperasi ${sekolah} menjual alat tulis. Omzet bulanan yang tercatat adalah sebanyak 9.804 buah barang terjual.`,
+              qtext: "Pada bilangan 9.804, manakah angka yang menempati nilai tempat ratusan?",
+              opts: ["A. Angka 8", "B. Angka 9", "C. Angka 0", "D. Angka 4"],
+              key: "a",
+              expl: "Pada bilangan 9.804, ratusan ditempati oleh angka 8 (nilainya 800)."
+            }
+          ];
+          const t = cacahTemplates[num % cacahTemplates.length];
+          stim = t.stim; qtext = t.qtext; opts = t.opts; key = t.key; expl = t.expl;
         }
       }
       else if (topic.includes("KPK") || topic.includes("FPB") || topic.includes("Pembagian") || topic.includes("Perkalian")) {
-        stim = `${nameA} dan ${nameB} adalah murid yang rajin mendatangi perpustakaan sekolah. ${nameA} pergi ke perpustakaan ${sekolah} setiap 4 hari sekali, sedangkan ${nameB} berkunjung setiap 6 hari sekali.`;
-        qtext = "Jika hari ini mereka membaca buku bersama di perpustakaan, berapa hari lagikah mereka akan bertemu bersama di perpustakaan kembali?";
-        opts = ["A. 8 hari", "B. 10 hari", "C. 12 hari", "D. 24 hari"];
-        key = "c";
-        expl = "Pertemuan bersama dicari menggunakan Kelipatan Persekutuan Terkecil (KPK) dari 4 dan 6. Kelipatan 4 = 4, 8, 12, 16... Kelipatan 6 = 6, 12, 18... KPK terendah adalah 12.";
+        const kpkTemplates = [
+          {
+            stim: `${nameA} dan ${nameB} rajin berkunjung ke perpustakaan. ${nameA} berkunjung 4 hari sekali, ${nameB} 6 hari sekali.`,
+            qtext: "Jika hari ini mereka bertemu, berapa hari lagikah mereka akan bertemu di perpustakaan bersama lagi?",
+            opts: ["A. 8 hari", "B. 10 hari", "C. 12 hari", "D. 24 hari"],
+            key: "c",
+            expl: "KPK dari 4 dan 6 adalah 12. Maka mereka bertemu 12 hari lagi."
+          },
+          {
+            stim: `${nameA} memiliki 12 kelereng merah dan ${nameB} memiliki 18 kelereng biru. Semua kelereng akan dimasukkan ke dalam wadah sama banyak.`,
+            qtext: "Berapakah jumlah wadah terbanyak yang dapat digunakan untuk kelereng-kelereng tersebut?",
+            opts: ["A. 6 wadah", "B. 4 wadah", "C. 3 wadah", "D. 8 wadah"],
+            key: "a",
+            expl: "FPB dari 12 dan 18 adalah 6. Jadi wadah terbanyak adalah 6."
+          },
+          {
+            stim: `${nameA} berlatih bulu tangkis setiap 3 hari, sedangkan ${nameB} berlatih setiap 5 hari sekali di lapangan desa.`,
+            qtext: "Berapa hari lagikah mereka akan berlatih bulu tangkis bersama-sama kembali?",
+            opts: ["A. 15 hari", "B. 30 hari", "C. 8 hari", "D. 10 hari"],
+            key: "a",
+            expl: "KPK dari 3 dan 5 adalah 15. Jadi mereka berlatih bersama 15 hari lagi."
+          },
+          {
+            stim: `Ibu membeli 15 jeruk dan 20 apel. Buah tersebut ingin dibagikan kepada teman ${nameA} sama rata tanpa sisa.`,
+            qtext: "Berapakah jumlah teman terbanyak yang bisa menerima pembagian buah dari ibu?",
+            opts: ["A. 5 orang", "B. 4 orang", "C. 10 orang", "D. 2 orang"],
+            key: "a",
+            expl: "FPB dari 15 dan 20 adalah 5. Jadi jumlah teman terbanyak adalah 5 orang."
+          }
+        ];
+        const t = kpkTemplates[num % kpkTemplates.length];
+        stim = t.stim; qtext = t.qtext; opts = t.opts; key = t.key; expl = t.expl;
       }
       else if (topic.includes("Luas") || topic.includes("Persegi Panjang") || topic.includes("Keliling")) {
-        stim = `Lapangan olah raga di ${sekolah} memiliki bentuk persegi panjang dengan ukuran panjang 15 meter dan lebar 10 meter.`;
-        qtext = "Berapakah luas keseluruhan dari lapangan olah raga sekolah dasar tersebut?";
-        opts = ["A. 25 meter persegi", "B. 50 meter persegi", "C. 150 meter persegi", "D. 300 meter persegi"];
-        key = "c";
-        expl = "Luas persegi panjang dihitung dengan mengalikan panjang dan lebar. Luas = 15 meter x 10 meter = 150 meter persegi.";
-        
+        const luasTemplates = [
+          {
+            stim: `Lapangan olahraga berbentuk persegi panjang di ${sekolah} memiliki ukuran panjang 15 meter dan lebar 10 meter.`,
+            qtext: "Berapakah luas keseluruhan dari lapangan olahraga tersebut?",
+            opts: ["A. 25 meter persegi", "B. 50 meter persegi", "C. 150 meter persegi", "D. 300 meter persegi"],
+            key: "c",
+            expl: "Luas = panjang x lebar = 15 m x 10 m = 150 meter persegi."
+          },
+          {
+            stim: `${nameA} menghias ubin lantai kelas berbentuk persegi dengan panjang sisinya adalah 30 cm.`,
+            qtext: "Berapakah keliling keseluruhan ubin lantai kelas tersebut?",
+            opts: ["A. 120 cm", "B. 90 cm", "C. 60 cm", "D. 900 cm"],
+            key: "a",
+            expl: "Keliling persegi = 4 x sisi = 4 x 30 cm = 120 cm."
+          },
+          {
+            stim: `Meja belajar di ruang kelas ${sekolah} berbentuk persegi panjang dengan panjang 120 cm and lebar 50 cm.`,
+            qtext: "Berapakah luas permukaan dari meja belajar tersebut?",
+            opts: ["A. 6.000 cm persegi", "B. 340 cm persegi", "C. 170 cm persegi", "D. 5.000 cm persegi"],
+            key: "a",
+            expl: "Luas = panjang x lebar = 120 cm x 50 cm = 6.000 cm persegi."
+          },
+          {
+            stim: `Paman membuat pagar untuk kebun bunga berbentuk persegi dengan panjang sisinya adalah 12 meter.`,
+            qtext: "Berapakah luas kebun bunga milik paman tersebut?",
+            opts: ["A. 144 meter persegi", "B. 48 meter persegi", "C. 24 meter persegi", "D. 96 meter persegi"],
+            key: "a",
+            expl: "Luas persegi = sisi x sisi = 12 m x 12 m = 144 meter persegi."
+          }
+        ];
+        const t = luasTemplates[num % luasTemplates.length];
+        stim = t.stim; qtext = t.qtext; opts = t.opts; key = t.key; expl = t.expl;
+
         sc = `<svg viewBox="0 0 150 100" style="max-width: 150px; display: block; margin: 10px auto;">
           <rect x="15" y="15" width="120" height="70" fill="#f1f5f9" stroke="#334155" stroke-width="3"/>
           <text x="75" y="10" font-family="sans-serif" font-size="10" text-anchor="middle">Panjang: 15 m</text>
@@ -1355,12 +1532,39 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
         </svg>`;
       }
       else if (topic.includes("Segitiga") || topic.includes("segitiga") || topic.includes("Geometri")) {
-        stim = `Siswa kelas ${schoolInfo?.gradeClass || "4"} sedang mempelajari bangun datar segitiga siku-siku menggunakan sedotan plastik daur ulang.`;
-        qtext = "Jika sebuah segitiga memiliki salah satu sudut yang besarnya tepat 90 derajat, segitiga tersebut termasuk golongan jenis segitiga apa?";
-        opts = ["A. Segitiga Sama Sisi", "B. Segitiga Siku-Siku", "C. Segitiga Sama Kaki", "D. Segitiga Sembarang"];
-        key = "b";
-        expl = "Segitiga yang mempunyai satu sudut sebesar 90 derajat didefinisikan sebagai Segitiga Siku-siku.";
-        
+        const geoTemplates = [
+          {
+            stim: `Siswa sedang mengamati bangun datar segitiga yang ditarik garis di papan tulis.`,
+            qtext: "Jika sebuah segitiga memiliki sudut yang besarnya tepat 90 derajat, segitiga tersebut disebut?",
+            opts: ["A. Segitiga Siku-Siku", "B. Segitiga Sama Sisi", "C. Segitiga Sama Kaki", "D. Segitiga Sembarang"],
+            key: "a",
+            expl: "Segitiga siku-siku memiliki salah satu sudut sebesar 90 derajat."
+          },
+          {
+            stim: `Di ${latar}, ${nameA} membuat segitiga dari ranting kayu dengan ketiga sisinya sama panjang.`,
+            qtext: "Segitiga yang memiliki ketiga sisi yang sama panjang dinamakan segitiga?",
+            opts: ["A. Segitiga Sama Sisi", "B. Segitiga Sama Kaki", "C. Segitiga Siku-Siku", "D. Segitiga Sembarang"],
+            key: "a",
+            expl: "Segitiga sama sisi memiliki tiga sisi yang sama panjang."
+          },
+          {
+            stim: `${nameGuru} menanyakan total jumlah sudut dalam bangun datar segitiga apa saja kepada para murid.`,
+            qtext: "Berapakah jumlah seluruh sudut bagian dalam dari bangun datar segitiga?",
+            opts: ["A. 180 derajat", "B. 90 derajat", "C. 360 derajat", "D. 270 derajat"],
+            key: "a",
+            expl: "Jumlah total sudut bagian dalam segitiga selalu 180 derajat."
+          },
+          {
+            stim: `${nameB} memotong kertas lipat berbentuk segitiga yang mempunyai dua sisi sama panjang.`,
+            qtext: "Segitiga yang memiliki dua sisi yang sama panjang dinamakan segitiga?",
+            opts: ["A. Segitiga Sama Kaki", "B. Segitiga Sama Sisi", "C. Segitiga Siku-Siku", "D. Segitiga Sembarang"],
+            key: "a",
+            expl: "Segitiga sama kaki adalah segitiga dengan dua sisi sama panjang."
+          }
+        ];
+        const t = geoTemplates[num % geoTemplates.length];
+        stim = t.stim; qtext = t.qtext; opts = t.opts; key = t.key; expl = t.expl;
+
         sc = `<svg viewBox="0 0 120 100" style="max-width: 120px; display: block; margin: 10px auto;">
           <polygon points="20,80 100,80 20,20" fill="#f8fafc" stroke="#334155" stroke-width="3"/>
           <rect x="20" y="70" width="10" height="10" fill="none" stroke="#334155" stroke-width="1.5"/>
@@ -1371,79 +1575,494 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
         </svg>`;
       }
       else {
-        stim = `Di koperasi ${sekolah}, ${nameA} membeli pensil untuk keperluan ujian akhir tahun sekolah Merdeka.`;
-        qtext = `Jika ${nameA} memiliki 2 pensil baru dan ${nameB} memberikan lagi 5 pensil yang sama, berapakah jumlah seluruh pensil ${nameA} sekarang?`;
-        opts = ["A. 5 pensil", "B. 7 pensil", "C. 10 pensil", "D. 12 pensil"];
-        key = "b";
-        expl = "Jumlah pensil dihitung dengan menambahkan pensil awal dengan pensil pemberian. 2 pensil + 5 pensil = 7 pensil.";
+        const matMiscTemplates = [
+          {
+            stim: `Di koperasi ${sekolah}, ${nameA} membeli alat tulis untuk keperluan kelas.`,
+            qtext: `Jika ${nameA} memiliki 2 pensil dan ${nameB} memberikan lagi 5 pensil yang sama, berapakah jumlah pensil ${nameA} sekarang?`,
+            opts: ["A. 5 pensil", "B. 7 pensil", "C. 10 pensil", "D. 12 pensil"],
+            key: "b",
+            expl: "2 pensil + 5 pensil = 7 pensil."
+          },
+          {
+            stim: `Di kebun, ${nameA} mengumpulkan daun kering. Ia mengumpulkan 8 daun kering, lalu angin meniup gugur 3 daun sehingga hilang.`,
+            qtext: "Berapakah sisa daun kering yang masih disimpan oleh murid tersebut?",
+            opts: ["A. 5 daun", "B. 3 daun", "C. 8 daun", "D. 11 daun"],
+            key: "a",
+            expl: "8 daun - 3 daun = 5 daun."
+          },
+          {
+            stim: `${nameA} membawa 3 kantong berisi jeruk. Setiap kantong berisi 4 buah jeruk segar.`,
+            qtext: "Berapakah jumlah buah jeruk secara keseluruhan yang dibawa oleh murid tersebut?",
+            opts: ["A. 12 jeruk", "B. 7 jeruk", "C. 9 jeruk", "D. 16 jeruk"],
+            key: "a",
+            expl: "3 kantong x 4 jeruk = 12 jeruk."
+          },
+          {
+            stim: `Ibu guru membawa 10 buku tulis. Buku tulis tersebut dibagikan rata kepada 2 murid yaitu ${nameA} dan ${nameB}.`,
+            qtext: "Berapakah buku tulis yang diterima oleh masing-masing murid?",
+            opts: ["A. 5 buku", "B. 2 buku", "C. 10 buku", "D. 4 buku"],
+            key: "a",
+            expl: "10 buku : 2 murid = 5 buku per murid."
+          }
+        ];
+        const t = matMiscTemplates[num % matMiscTemplates.length];
+        stim = t.stim; qtext = t.qtext; opts = t.opts; key = t.key; expl = t.expl;
       }
     }
     else if (subject.includes("Bahasa Indonesia")) {
-      stim = `Bacalah teks singkat berikut! ${nameA} rajin merawat koleksi buku miliknya di rumah. Setiap hari Sabtu, ia membersihkan debu yang menempel pada sampul buku memakai kemoceng bulu ayam.`;
-      
       if (topic.includes("Ejaan") || topic.includes("Menulis") || topic.includes("EYD") || topic.includes("Kapital")) {
-        qtext = "Manakah kalimat di bawah ini yang menggunakan huruf kapital secara tepat sesuai dengan kaidah ejaan Bahasa Indonesia?";
-        opts = [
-          "A. andi pergi ke desa makmur kemarin sore.",
-          "B. Andi pergi ke Desa Makmur kemarin sore.",
-          "C. andi Pergi Ke Desa Makmur Kemarin Sore.",
-          "D. Andi pergi ke desa Makmur kemarin Sore."
+        const indEjaanTemplates = [
+          {
+            stimFaseA: `Ejaan huruf kapital digunakan pada nama orang di awal kalimat.`,
+            qtextFaseA: `Penulisan nama orang dengan huruf kapital yang benar adalah...`,
+            optsFaseA: ["A. Saya bermain dengan Udin.", "B. Saya bermain dengan udin.", "C. Saya bermain dengan UDIN.", "D. saya bermain dengan udin."],
+            keyFaseA: "a",
+            explFaseA: "Nama orang 'Udin' harus menggunakan huruf kapital di awal kata.",
+
+            stimFaseBC: `Bacalah kalimat acak berikut! Kalimat ini ditulis oleh ${nameA} saat mencatat kegiatan kerja bakti di desa.`,
+            qtextFaseBC: "Manakah kalimat di bawah ini yang menggunakan huruf kapital secara tepat sesuai dengan ejaan Bahasa Indonesia?",
+            optsFaseBC: [
+              "A. andi pergi ke desa makmur kemarin sore.",
+              "B. Andi pergi ke Desa Makmur kemarin sore.",
+              "C. andi Pergi Ke Desa Makmur Kemarin Sore.",
+              "D. Andi pergi ke desa Makmur kemarin Sore."
+            ],
+            keyFaseBC: "b",
+            explFaseBC: "Huruf kapital digunakan pada awal kalimat (Andi) dan pada unsur nama geografi (Desa Makmur)."
+          },
+          {
+            stimFaseA: `Tanda titik (.) digunakan untuk mengakhiri kalimat berita.`,
+            qtextFaseA: `Kalimat di bawah yang menggunakan tanda titik dengan benar adalah...`,
+            optsFaseA: ["A. Wayan suka makan buah pisang.", "B. Wayan suka makan buah pisang?", "C. Wayan suka makan buah pisang!", "D. Wayan suka makan buah pisang,"],
+            keyFaseA: "a",
+            explFaseA: "Kalimat berita diakhiri dengan tanda titik.",
+
+            stimFaseBC: `Pembelajaran menulis tentang tanda baca diajarkan oleh Ibu ${nameGuru} di depan kelas.`,
+            qtextFaseBC: "Manakah kalimat berikut yang menggunakan tanda koma (,) dan titik (.) secara tepat?",
+            optsFaseBC: [
+              "A. Lani membeli buku, pensil, dan penggaris di koperasi.",
+              "B. Lani membeli buku pensil dan penggaris di koperasi.",
+              "C. Lani membeli buku, pensil dan penggaris, di koperasi.",
+              "D. Lani, membeli buku, pensil dan penggaris di koperasi."
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Tanda koma digunakan untuk merinci lebih dari dua benda (buku, pensil, dan penggaris)."
+          },
+          {
+            stimFaseA: `Tanda tanya (?) digunakan untuk kalimat tanya.`,
+            qtextFaseA: `Kalimat tanya di bawah ini yang paling benar adalah...`,
+            optsFaseA: ["A. Siapa nama temanmu?", "B. Siapa nama temanmu.", "C. Siapa nama temanmu!", "D. Siapa nama temanmu,"],
+            keyFaseA: "a",
+            explFaseA: "Pertanyaan menanyakan informasi dan harus diakhiri tanda tanya.",
+
+            stimFaseBC: `${nameB} menulis laporan pengamatan mengenai kebersihan lingkungan sekitar.`,
+            qtextFaseBC: "Kalimat manakah yang menggunakan kata tanya dan tanda baca tanya secara benar?",
+            optsFaseBC: [
+              "A. Mengapa kita harus menjaga kebersihan lingkungan?",
+              "B. Mengapa kita harus menjaga kebersihan lingkungan.",
+              "C. Mengapa kita harus menjaga kebersihan lingkungan!",
+              "D. Mengapa kita harus menjaga kebersihan lingkungan,"
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Kata tanya 'Mengapa' menuntut penjelasan dan wajib diakhiri tanda tanya (?) di akhir kalimat."
+          },
+          {
+            stimFaseA: `Nama hari diawali dengan huruf kapital.`,
+            qtextFaseA: `Manakah penulisan nama hari yang paling benar?`,
+            optsFaseA: ["A. Kami libur hari Minggu.", "B. Kami libur hari minggu.", "C. Kami libur Hari minggu.", "D. Kami libur hari MINGGU."],
+            keyFaseA: "a",
+            explFaseA: "Nama hari 'Minggu' wajib diawali huruf kapital.",
+
+            stimFaseBC: `Guru menugaskan siswa mencatat kegiatan harian di buku harian masing-masing.`,
+            qtextFaseBC: "Manakah kalimat berikut yang menuliskan nama hari dan bulan secara tepat?",
+            optsFaseBC: [
+              "A. Upacara hari Senin dilaksanakan bulan Agustus.",
+              "B. Upacara hari senin dilaksanakan bulan agustus.",
+              "C. Upacara Hari Senin dilaksanakan Bulan Agustus.",
+              "D. Upacara hari Senin dilaksanakan Bulan agustus."
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Nama hari (Senin) dan nama bulan (Agustus) wajib diawali dengan huruf kapital."
+          }
         ];
-        key = "b";
-        expl = "Huruf kapital digunakan pada awal kalimat (Andi) dan pada huruf pertama unsur nama geografi (Desa Makmur). Maka pilihan B adalah yang paling tepat.";
+        const t = indEjaanTemplates[num % indEjaanTemplates.length];
+        if (currentPhase === "Fase A") {
+          stim = t.stimFaseA; qtext = t.qtextFaseA; opts = t.optsFaseA; key = t.keyFaseA; expl = t.explFaseA;
+        } else {
+          stim = t.stimFaseBC; qtext = t.qtextFaseBC; opts = t.optsFaseBC; key = t.keyFaseBC; expl = t.explFaseBC;
+        }
       } else {
-        qtext = `Berdasarkan teks bacaan, apa yang dilakukan oleh ${nameA} setiap hari Sabtu untuk merawat bukunya?`;
-        opts = [
-          "A. Membeli buku cerita bergambar baru di kota",
-          "B. Menyimpan tumpukan buku di dalam kardus mainan",
-          "C. Membersihkan debu yang menempel di sampul buku",
-          "D. Meminjamkan seluruh bukunya kepada tetangga rumah"
+        const indCompTemplates = [
+          {
+            stimFaseA: `${nameA} suka membaca buku cerita. Setiap pagi, ia membaca buku di perpustakaan.`,
+            qtextFaseA: `Di mana tempat ${nameA} membaca buku cerita?`,
+            optsFaseA: ["A. Di perpustakaan", "B. Di kantin", "C. Di lapangan", "D. Di pasar"],
+            keyFaseA: "a",
+            explFaseA: "Sesuai teks, tempat membaca buku adalah di perpustakaan.",
+
+            stimFaseBC: `Bacalah teks berikut! ${nameA} rajin merawat koleksi buku miliknya di rumah. Setiap hari Sabtu, ia membersihkan debu memakai kemoceng bulu ayam.`,
+            qtextFaseBC: `Berdasarkan bacaan di atas, apa yang dilakukan oleh ${nameA} setiap hari Sabtu untuk merawat bukunya?`,
+            optsFaseBC: [
+              "A. Membersihkan debu yang menempel di sampul buku",
+              "B. Membeli buku cerita bergambar baru di toko kota",
+              "C. Menyimpan tumpukan buku di dalam kardus mainan",
+              "D. Meminjamkan seluruh bukunya kepada tetangga dekat"
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Informasi eksplisit di teks menyatakan ia membersihkan debu memakai kemoceng bulu ayam."
+          },
+          {
+            stimFaseA: `${nameA} menyiram bunga di kebun. Daun bunga disiram supaya tidak layu.`,
+            qtextFaseA: `Mengapa ${nameA} menyiram daun bunga?`,
+            optsFaseA: ["A. Supaya tidak layu", "B. Supaya basah semua", "C. Agar cepat mati", "D. Karena mau bermain air"],
+            keyFaseA: "a",
+            explFaseA: "Bunga disiram agar tidak layu.",
+
+            stimFaseBC: `Bacalah teks berikut! Setiap sore, ${nameA} menyiram tanaman cabai di teras rumah. Tanaman itu disiram secara teratur agar tumbuh subur dan lekas berbuah lebat untuk membantu ibu memasak.`,
+            qtextFaseBC: `Apakah tujuan utama ${nameA} menyiram tanaman cabai tersebut secara teratur?`,
+            optsFaseBC: [
+              "A. Agar tanaman tumbuh subur dan lekas berbuah lebat",
+              "B. Agar tanaman tidak terlalu tinggi menghalangi jalan",
+              "C. Untuk mengisi waktu luang sepulang dari bermain",
+              "D. Menghabiskan air bersih di wadah penyimpanan teras"
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Tanaman disiram agar tumbuh subur dan berbuah lebat."
+          },
+          {
+            stimFaseA: `${nameA} membuang sampah makanan di tempat sampah. Halaman pun jadi bersih.`,
+            qtextFaseA: `Membuang sampah di tempat sampah membuat halaman menjadi...`,
+            optsFaseA: ["A. Bersih", "B. Kotor", "C. Penuh lalat", "D. Bau"],
+            keyFaseA: "a",
+            explFaseA: "Membuang sampah membuat halaman bersih.",
+
+            stimFaseBC: `Bacalah teks berikut! ${nameA} selalu membuang sisa bungkus jajanan ke dalam tong sampah. Hal ini menjaga agar lingkungan tetap bersih dan bebas dari genangan sarang nyamuk.`,
+            qtextFaseBC: "Berdasarkan kutipan teks di atas, apakah manfaat utama dari kebiasaan membuang sampah pada tempatnya?",
+            optsFaseBC: [
+              "A. Lingkungan tetap bersih dan bebas dari sarang nyamuk",
+              "B. Sampah menumpuk lebih cepat di tempat pembuangan",
+              "C. Memperindah ruangan kelas dengan aneka bungkus warna-warni",
+              "D. Murid terbebas dari tugas piket membersihkan kelas"
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Membuang sampah menjaga kebersihan dan mencegah nyamuk bersarang."
+          },
+          {
+            stimFaseA: `Bel sekolah berbunyi keras. Anak-anak berbaris rapi masuk ke kelas.`,
+            qtextFaseA: `Apa yang dilakukan anak-anak setelah bel berbunyi?`,
+            optsFaseA: ["A. Berbaris rapi masuk kelas", "B. Pulang ke rumah", "C. Membeli makanan", "D. Bermain bola"],
+            keyFaseA: "a",
+            explFaseA: "Setelah bel berbunyi, anak-anak berbaris rapi masuk kelas.",
+
+            stimFaseBC: `Bacalah teks berikut! Sebelum masuk ke ruang kelas, para murid dibiasakan berbaris tertib. Ketika bel tanda masuk berbunyi, mereka melangkah masuk teratur sambil bersalaman dengan bapak dan ibu guru.`,
+            qtextFaseBC: "Kapan para murid melangkah masuk kelas secara teratur berdasarkan teks tersebut?",
+            optsFaseBC: [
+              "A. Ketika bel tanda masuk sekolah berbunyi",
+              "B. Saat jam istirahat sekolah telah selesai",
+              "C. Sebelum bapak dan ibu guru tiba di sekolah",
+              "D. Sewaktu hari sudah sore dan pintu sekolah ditutup"
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Melangkah masuk teratur dilakukan ketika bel tanda masuk berbunyi."
+          }
         ];
-        key = "c";
-        expl = "Sesuai informasi eksplisit di dalam teks stimulus, setiap hari Sabtu ia membersihkan debu yang menempel di sampul buku memakai kemoceng.";
+        const t = indCompTemplates[num % indCompTemplates.length];
+        if (currentPhase === "Fase A") {
+          stim = t.stimFaseA; qtext = t.qtextFaseA; opts = t.optsFaseA; key = t.keyFaseA; expl = t.explFaseA;
+        } else {
+          stim = t.stimFaseBC; qtext = t.qtextFaseBC; opts = t.optsFaseBC; key = t.keyFaseBC; expl = t.explFaseBC;
+        }
       }
     }
     else if (subject.includes("Pancasila")) {
-      stim = `Siswa-siswi di ${sekolah} selalu mengamalkan nilai gotong royong dan kebersamaan dalam persahabatan mereka di kelas maupun luar kelas.`;
-      
       if (topic.includes("Simbol") || topic.includes("Pancasila") || topic.includes("Lambang")) {
-        qtext = "Manakah lambang atau simbol dari sila kedua Pancasila pada perisai burung Garuda?";
-        opts = ["A. Bintang emas", "B. Rantai emas lingkaran", "C. Pohon beringin rindang", "D. Kepala banteng hitam"];
-        key = "b";
-        expl = "Simbol Sila kedua Pancasila (Kemanusiaan yang Adil dan Beradab) diwakili oleh lambang Rantai Emas. Bintang adalah sila ke-1, Beringin ke-3, Kepala Banteng ke-4, Padi & Kapas ke-5.";
-        
+        const pancSimbolTemplates = [
+          {
+            stimFaseA: `Perisai burung Garuda mempunyai simbol sila pertama.`,
+            qtextFaseA: `Apa lambang atau simbol dari sila kesatu Pancasila?`,
+            optsFaseA: ["A. Bintang emas", "B. Rantai emas", "C. Pohon beringin", "D. Kepala banteng"],
+            keyFaseA: "a",
+            explFaseA: "Sila ke-1 dilambangkan dengan Bintang Emas.",
+
+            stimFaseBC: `Di dinding kelas terpajang lambang negara Garuda Pancasila dengan perisai di dadanya.`,
+            qtextFaseBC: "Apakah lambang yang mewakili sila kesatu Pancasila pada perisai burung Garuda?",
+            optsFaseBC: ["A. Bintang emas di tengah perisai", "B. Rantai baja lingkaran di kanan bawah", "C. Pohon beringin rindang di kanan atas", "D. Kepala banteng hitam di kiri atas"],
+            keyFaseBC: "a",
+            explFaseBC: "Bintang emas merupakan lambang Sila ke-1 Pancasila (Ketuhanan Yang Maha Esa)."
+          },
+          {
+            stimFaseA: `Sila kedua Pancasila dilambangkan pada perisai Garuda.`,
+            qtextFaseA: `Apa lambang atau simbol sila kedua Pancasila?`,
+            optsFaseA: ["A. Rantai emas", "B. Bintang emas", "C. Pohon beringin", "D. Kepala banteng"],
+            keyFaseA: "a",
+            explFaseA: "Sila ke-2 dilambangkan dengan Rantai Emas.",
+
+            stimFaseBC: `Ketika upacara bendera, murid-murid melafalkan Pancasila secara lantang dan khidmat.`,
+            qtextFaseBC: "Manakah lambang atau simbol dari sila kedua Pancasila pada perisai burung Garuda?",
+            optsFaseBC: ["A. Rantai emas lingkaran", "B. Bintang emas bercahaya", "C. Pohon beringin rindang", "D. Kepala banteng hitam"],
+            keyFaseBC: "a",
+            explFaseBC: "Rantai emas melambangkan Sila ke-2 Pancasila (Kemanusiaan yang Adil dan Beradab)."
+          },
+          {
+            stimFaseA: `Lambang Pancasila sila ketiga digambar di perisai.`,
+            qtextFaseA: `Apa simbol dari sila ketiga Pancasila?`,
+            optsFaseA: ["A. Pohon beringin", "B. Rantai emas", "C. Bintang emas", "D. Kepala banteng"],
+            keyFaseA: "a",
+            explFaseA: "Sila ke-3 dilambangkan dengan Pohon Beringin.",
+
+            stimFaseBC: `${nameGuru} menunjukkan kartu gambar sila Pancasila kepada anak-anak saat belajar.`,
+            qtextFaseBC: "Apakah lambang dari sila ketiga Pancasila yang melambangkan persatuan rakyat Indonesia?",
+            optsFaseBC: ["A. Pohon beringin", "B. Rantai emas lingkaran", "C. Bintang emas bersudut lima", "D. Kepala banteng hitam"],
+            keyFaseBC: "a",
+            explFaseBC: "Pohon beringin melambangkan Sila ke-3 Pancasila (Persatuan Indonesia)."
+          },
+          {
+            stimFaseA: `Sila keempat Pancasila digambarkan pada perisai Garuda.`,
+            qtextFaseA: `Apa lambang sila keempat Pancasila?`,
+            optsFaseA: ["A. Kepala banteng", "B. Bintang emas", "C. Rantai emas", "D. Pohon beringin"],
+            keyFaseA: "a",
+            explFaseA: "Sila ke-4 dilambangkan dengan Kepala Banteng.",
+
+            stimFaseBC: `Dalam materi Pancasila, siswa mempelajari arti musyawarah untuk mufakat di sekolah.`,
+            qtextFaseBC: "Apakah simbol dari sila keempat Pancasila pada lambang negara Garuda Pancasila?",
+            optsFaseBC: ["A. Kepala banteng", "B. Bintang emas", "C. Rantai emas lingkaran", "D. Padi dan kapas"],
+            keyFaseBC: "a",
+            explFaseBC: "Kepala banteng melambangkan Sila ke-4 Pancasila (Kerakyatan yang Dipimpin oleh Hikmat Kebijaksanaan dalam Permusyawaratan/Perwakilan)."
+          },
+          {
+            stimFaseA: `Sila kelima Pancasila digambar pada perisai burung Garuda.`,
+            qtextFaseA: `Apa simbol sila kelima Pancasila?`,
+            optsFaseA: ["A. Padi dan kapas", "B. Kepala banteng", "C. Bintang emas", "D. Rantai emas"],
+            keyFaseA: "a",
+            explFaseA: "Sila ke-5 dilambangkan dengan Padi dan Kapas.",
+
+            stimFaseBC: `Keadilan sosial dilambangkan dengan tanaman pangan dan sandang sandaran bangsa.`,
+            qtextFaseBC: "Apakah lambang yang mewakili sila kelima Pancasila pada perisai Garuda Pancasila?",
+            optsFaseBC: ["A. Padi dan kapas", "B. Kepala banteng hitam", "C. Rantai emas lingkaran", "D. Bintang emas"],
+            keyFaseBC: "a",
+            explFaseBC: "Padi dan kapas melambangkan Sila ke-5 Pancasila (Keadilan Sosial bagi Seluruh Rakyat Indonesia)."
+          }
+        ];
+        const t = pancSimbolTemplates[num % pancSimbolTemplates.length];
+        if (currentPhase === "Fase A") {
+          stim = t.stimFaseA; qtext = t.qtextFaseA; opts = t.optsFaseA; key = t.keyFaseA; expl = t.explFaseA;
+        } else {
+          stim = t.stimFaseBC; qtext = t.qtextFaseBC; opts = t.optsFaseBC; key = t.keyFaseBC; expl = t.explFaseBC;
+        }
+
         sc = `<svg viewBox="0 0 100 100" style="max-width: 100px; display: block; margin: 10px auto;">
           <rect x="10" y="10" width="80" height="80" rx="10" fill="#fef08a" stroke="#ca8a04" stroke-width="2"/>
           <circle cx="50" cy="50" r="22" stroke="#b45309" stroke-width="5" fill="none"/>
           <text x="50" y="54" font-family="sans-serif" font-size="12" font-weight="black" text-anchor="middle" fill="#b45309">⛓️</text>
         </svg>`;
       } else {
-        qtext = `Di bawah ini, manakah kegiatan yang mencerminkan pengamalan sila ketiga Pancasila (Persatuan Indonesia) ketika berada di sekolah?`;
-        opts = [
-          "A. Memilih-milih teman bermain berdasarkan asal daerah atau warna kulit",
-          "B. Melaksanakan piket kerja bakti membersihkan kelas bersama teman-teman",
-          "C. Mencontek hasil pekerjaan rumah milik teman dekat dengan diam-diam",
-          "D. Mengabaikan nasihat dari guru kelas ketika sedang dinasehati"
+        const pancMiscTemplates = [
+          {
+            stimFaseA: `Piket kelas bersama membuat kelas menjadi bersih dan rapi.`,
+            qtextFaseA: `Piket kelas bersama teman mencerminkan sila Pancasila ke...`,
+            optsFaseA: ["A. Sila ketiga", "B. Sila kesatu", "C. Sila kedua", "D. Sila keempat"],
+            keyFaseA: "a",
+            explFaseA: "Piket bersama menumbuhkan persatuan (Sila ke-3).",
+
+            stimFaseBC: `Siswa-siswi selalu membiasakan gotong royong dan menjaga kebersamaan dalam persahabatan mereka di sekolah.`,
+            qtextFaseBC: "Di bawah ini, manakah kegiatan yang mencerminkan pengamalan sila ketiga Pancasila (Persatuan Indonesia) ketika berada di sekolah?",
+            optsFaseBC: [
+              "A. Melaksanakan piket kerja bakti membersihkan kelas bersama teman-teman",
+              "B. Memilih-milih teman bermain berdasarkan asal daerah atau warna kulit",
+              "C. Mencontek hasil pekerjaan rumah milik teman dekat secara diam-diam",
+              "D. Mengabaikan nasihat dari guru kelas ketika sedang dinasehati"
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Kerja bakti piket kelas bersama mencerminkan persatuan dan gotong royong sila ke-3."
+          },
+          {
+            stimFaseA: `Memilih ketua kelas dilakukan dengan cara berdiskusi bersama.`,
+            qtextFaseA: `Berdiskusi memilih ketua kelas mencerminkan sila Pancasila ke...`,
+            optsFaseA: ["A. Sila keempat", "B. Sila kesatu", "C. Sila kedua", "D. Sila ketiga"],
+            keyFaseA: "a",
+            explFaseA: "Diskusi bersama untuk keputusan bersama mencerminkan musyawarah sila ke-4.",
+
+            stimFaseBC: `Setiap ada perbedaan pendapat dalam menentukan piket kelas, ${nameGuru} selalu mengajak para murid berkumpul mencari kesepakatan.`,
+            qtextFaseBC: "Sikap bermusyawarah mufakat untuk kepentingan bersama tersebut merupakan contoh pengamalan Pancasila yaitu sila ke?",
+            optsFaseBC: [
+              "A. Sila keempat",
+              "B. Sila kesatu",
+              "C. Sila kedua",
+              "D. Sila ketiga"
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Musyawarah mufakat diatur dalam sila ke-4 Pancasila."
+          },
+          {
+            stimFaseA: `Sebelum makan, ${nameA} membaca doa menurut agamanya.`,
+            qtextFaseA: `Membaca doa sebelum makan mencerminkan sila Pancasila ke...`,
+            optsFaseA: ["A. Sila kesatu", "B. Sila kedua", "C. Sila ketiga", "D. Sila kelima"],
+            keyFaseA: "a",
+            explFaseA: "Berdoa mencerminkan ketuhanan sila ke-1.",
+
+            stimFaseBC: `Di ${sekolah}, para murid memiliki latar belakang agama berbeda-beda namun tetap hidup rukun berdampingan.`,
+            qtextFaseBC: "Sikap saling menghormati dan memberi kesempatan kepada teman berbeda agama untuk beribadah mencerminkan sila?",
+            optsFaseBC: [
+              "A. Sila kesatu",
+              "B. Sila kedua",
+              "C. Sila ketiga",
+              "D. Sila kelima"
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Toleransi beragama adalah perwujudan sila ke-1 Pancasila."
+          },
+          {
+            stimFaseA: `${nameA} membagi bekal kue secara adil kepada teman sebangkunya.`,
+            qtextFaseA: `Sikap membagi kue secara adil di kelas mencerminkan sila Pancasila ke...`,
+            optsFaseA: ["A. Sila kelima", "B. Sila kesatu", "C. Sila kedua", "D. Sila ketiga"],
+            keyFaseA: "a",
+            explFaseA: "Sikap adil mencerminkan sila ke-5.",
+
+            stimFaseBC: `Dalam kerja kelompok, ${nameA} membagi tugas secara adil kepada seluruh anggota tanpa membeda-bedakan.`,
+            qtextFaseBC: "Tindakan membagi tugas secara adil kepada seluruh anggota kelompok mencerminkan sila Pancasila ke?",
+            optsFaseBC: [
+              "A. Sila kelima",
+              "B. Sila kesatu",
+              "C. Sila kedua",
+              "D. Sila ketiga"
+            ],
+            keyFaseBC: "a",
+            explFaseBC: "Berlaku adil kepada sesama teman merupakan wujud sila ke-5."
+          }
         ];
-        key = "b";
-        expl = "Kerja bakti piket kelas bersama mencerminkan persatuan, kebersamaan, dan kerjasama yang selaras dengan Sila ketiga Pancasila.";
+        const t = pancMiscTemplates[num % pancMiscTemplates.length];
+        if (currentPhase === "Fase A") {
+          stim = t.stimFaseA; qtext = t.qtextFaseA; opts = t.optsFaseA; key = t.keyFaseA; expl = t.explFaseA;
+        } else {
+          stim = t.stimFaseBC; qtext = t.qtextFaseBC; opts = t.optsFaseBC; key = t.keyFaseBC; expl = t.explFaseBC;
+        }
       }
     }
     else if (subject.includes("IPAS")) {
-      stim = `Dalam pelajaran Sains di ${sekolah}, ${nameGuru} mengajak para siswa melakukan eksplorasi ekologi di taman belakang kelas.`;
-      
       if (topic.includes("Wujud") || topic.includes("Zat") || topic.includes("Suhu")) {
-        qtext = "Ketika air mendidih di dalam panci panas, air berubah wujud menjadi uap air. Perubahan wujud dari benda cair menjadi benda gas ini disebut dengan istilah apa?";
-        opts = ["A. Mencair", "B. Membeku", "C. Menguap", "D. Mengembun"];
-        key = "c";
-        expl = "Perubahan wujud zat dari cair ke gas atau udara disebut Menguap. Sebaliknya gas ke cair adalah mengembun, cair ke padat membeku, padat ke cair mencair.";
-      } 
+        const ipasWujudTemplates = [
+          {
+            stimFaseA: `Air panas di panci mengeluarkan asap putih. Air itu dipanaskan.`,
+            qtextFaseA: `Perubahan dari air cair menjadi uap gas disebut...`,
+            optsFaseA: ["A. Menguap", "B. Mencair", "C. Membeku", "D. Mengembun"],
+            keyFaseA: "a",
+            explFaseA: "Air cair menjadi gas uap air dinamakan menguap.",
+
+            stimFaseBC: `Ketika air mendidih di dalam panci panas, air berubah wujud menjadi uap air.`,
+            qtextFaseBC: "Apakah sebutan untuk proses perubahan wujud zat dari cair menjadi benda gas seperti peristiwa tersebut?",
+            optsFaseBC: ["A. Menguap", "B. Mencair", "C. Membeku", "D. Mengembun"],
+            keyFaseBC: "a",
+            explFaseBC: "Perubahan wujud zat dari cair ke gas disebut menguap."
+          },
+          {
+            stimFaseA: `Es batu ditaruh di tempat terbuka menjadi air.`,
+            qtextFaseA: `Perubahan dari es padat menjadi air cair disebut...`,
+            optsFaseA: ["A. Mencair", "B. Membeku", "C. Menguap", "D. Mengembun"],
+            keyFaseA: "a",
+            explFaseA: "Padat ke cair disebut mencair.",
+
+            stimFaseBC: `Es batu diletakkan di tempat terbuka di bawah terik matahari lama-kelamaan menjadi air cair kembali.`,
+            qtextFaseBC: "Proses perubahan wujud dari padat menjadi cair ini dinamakan?",
+            optsFaseBC: ["A. Mencair", "B. Membeku", "C. Menguap", "D. Mengembun"],
+            keyFaseBC: "a",
+            explFaseBC: "Perubahan wujud dari padat ke cair adalah mencair."
+          },
+          {
+            stimFaseA: `Air dingin dimasukkan ke dalam kulkas membeku jadi es.`,
+            qtextFaseA: `Perubahan air cair menjadi es padat disebut...`,
+            optsFaseA: ["A. Membeku", "B. Mencair", "C. Menguap", "D. Mengembun"],
+            keyFaseA: "a",
+            explFaseA: "Cair ke padat disebut membeku.",
+
+            stimFaseBC: `Air dalam wadah plastik dimasukkan ke dalam ruang pembekuan (freezer) lemari es hingga mengeras.`,
+            qtextFaseBC: "Perubahan wujud zat dari cair menjadi padat ini disebut dengan istilah?",
+            optsFaseBC: ["A. Membeku", "B. Mencair", "C. Menguap", "D. Mengembun"],
+            keyFaseBC: "a",
+            explFaseBC: "Cair ke padat dinamakan membeku."
+          },
+          {
+            stimFaseA: `Daun basah di pagi hari karena ada embun air.`,
+            qtextFaseA: `Munculnya titik air di daun pada pagi hari disebut...`,
+            optsFaseA: ["A. Mengembun", "B. Menguap", "C. Mencair", "D. Membeku"],
+            keyFaseA: "a",
+            explFaseA: "Gas udara malam berubah jadi titik air disebut mengembun.",
+
+            stimFaseBC: `Pada pagi hari yang cerah, terdapat titik-titik air di atas permukaan daun pohon kelapa.`,
+            qtextFaseBC: "Peristiwa terbentuknya titik air dari uap udara malam tersebut dinamakan?",
+            optsFaseBC: ["A. Mengembun", "B. Menguap", "C. Mencair", "D. Menyublim"],
+            keyFaseBC: "a",
+            explFaseBC: "Perubahan gas uap menjadi cair disebut mengembun."
+          }
+        ];
+        const t = ipasWujudTemplates[num % ipasWujudTemplates.length];
+        if (currentPhase === "Fase A") {
+          stim = t.stimFaseA; qtext = t.qtextFaseA; opts = t.optsFaseA; key = t.keyFaseA; expl = t.explFaseA;
+        } else {
+          stim = t.stimFaseBC; qtext = t.qtextFaseBC; opts = t.optsFaseBC; key = t.keyFaseBC; expl = t.explFaseBC;
+        }
+      }
       else if (topic.includes("Tubuh") || topic.includes("Fotosintesis") || topic.includes("Organ")) {
-        qtext = "Manakah bagian tubuh tumbuhan yang memiliki fungsi utama untuk menyerap air dan unsur hara di dalam tanah?";
-        opts = ["A. Daun hijau", "B. Batang kayu", "C. Bunga hias", "D. Akar serabut"];
-        key = "d";
-        expl = "Akar tumbuhan berfungsi menyerap air dan garam-garam mineral (unsur hara) dari dalam tanah untuk disalurkan ke daun.";
-        
+        const ipasOrganTemplates = [
+          {
+            stimFaseA: `Tumbuhan menyerap air dari dalam tanah menggunakan bagian bawahnya.`,
+            qtextFaseA: `Bagian tumbuhan di dalam tanah yang menyerap air adalah...`,
+            optsFaseA: ["A. Akar", "B. Daun", "C. Batang", "D. Bunga"],
+            keyFaseA: "a",
+            explFaseA: "Akar berfungsi menyerap air di tanah.",
+
+            stimFaseBC: `Dalam pelajaran Sains, para murid mengamati struktur tumbuhan di halaman sekolah.`,
+            qtextFaseBC: "Manakah bagian tubuh tumbuhan yang memiliki fungsi utama untuk menyerap air dan unsur hara di dalam tanah?",
+            optsFaseBC: ["A. Akar", "B. Daun hijau", "C. Batang kayu", "D. Bunga hias"],
+            keyFaseBC: "a",
+            explFaseBC: "Akar menyerap air dan unsur hara dari tanah ke seluruh bagian tumbuhan."
+          },
+          {
+            stimFaseA: `Tumbuhan memasak makanannya di daun berwarna hijau.`,
+            qtextFaseA: `Tempat tumbuhan memasak makanan sendiri disebut...`,
+            optsFaseA: ["A. Daun", "B. Akar", "C. Batang", "D. Biji"],
+            keyFaseA: "a",
+            explFaseA: "Fotosintesis terjadi di daun.",
+
+            stimFaseBC: `Tumbuhan hijau membuat zat makanan sendiri dengan bantuan sinar matahari.`,
+            qtextFaseBC: "Bagian tubuh tumbuhan manakah yang berfungsi sebagai tempat fotosintesis terjadi?",
+            optsFaseBC: ["A. Daun", "B. Akar serabut", "C. Batang kayu", "D. Biji buah"],
+            keyFaseBC: "a",
+            explFaseBC: "Fotosintesis utamanya berlangsung di daun karena mengandung klorofil."
+          },
+          {
+            stimFaseA: `Batang tumbuhan menyalurkan air dari akar ke daun.`,
+            qtextFaseA: `Bagian tumbuhan yang mengalirkan air ke daun adalah...`,
+            optsFaseA: ["A. Batang", "B. Akar", "C. Daun", "D. Bunga"],
+            keyFaseA: "a",
+            explFaseA: "Batang menyalurkan air dari bawah ke atas.",
+
+            stimFaseBC: `Air dari dalam tanah diangkut naik menuju ke daun untuk proses fotosintesis.`,
+            qtextFaseBC: "Organ tumbuhan manakah yang berfungsi sebagai saluran pengangkut air dari akar ke daun?",
+            optsFaseBC: ["A. Batang", "B. Daun", "C. Bunga", "D. Buah"],
+            keyFaseBC: "a",
+            explFaseBC: "Batang mengangkut air dan mineral dari akar menuju daun."
+          },
+          {
+            stimFaseA: `Bunga pada tumbuhan akan berubah menjadi biji baru.`,
+            qtextFaseA: `Bagian tumbuhan yang berfungsi untuk perkembangbiakan adalah...`,
+            optsFaseA: ["A. Bunga", "B. Akar", "C. Batang", "D. Daun"],
+            keyFaseA: "a",
+            explFaseA: "Bunga adalah alat perkembangbiakan tumbuhan generatif.",
+
+            stimFaseBC: `Tumbuhan menghasilkan biji agar kelestariannya di alam bebas tetap terjaga.`,
+            qtextFaseBC: "Bagian tumbuhan manakah yang berfungsi utama sebagai alat perkembangbiakan generatif?",
+            optsFaseBC: ["A. Bunga", "B. Akar", "C. Batang", "D. Daun"],
+            keyFaseBC: "a",
+            explFaseBC: "Bunga mengandung benang sari dan putik untuk pembuahan generatif."
+          }
+        ];
+        const t = ipasOrganTemplates[num % ipasOrganTemplates.length];
+        if (currentPhase === "Fase A") {
+          stim = t.stimFaseA; qtext = t.qtextFaseA; opts = t.optsFaseA; key = t.keyFaseA; expl = t.explFaseA;
+        } else {
+          stim = t.stimFaseBC; qtext = t.qtextFaseBC; opts = t.optsFaseBC; key = t.keyFaseBC; expl = t.explFaseBC;
+        }
+
         sc = `<svg viewBox="0 0 100 100" style="max-width: 100px; display: block; margin: 10px auto;">
           <rect x="45" y="10" width="10" height="60" fill="#a16207"/>
           <circle cx="50" cy="25" r="20" fill="#15803d"/>
@@ -1452,24 +2071,149 @@ export function generateFallbackSoal(schoolInfo: any, subject: string, kisiKisi:
         </svg>`;
       }
       else {
-        qtext = "Makhluk hidup yang berperan menghasilkan makanan sendiri melalui bantuan sinar matahari (fotosintesis) disebut dengan kedudukan apa?";
-        opts = ["A. Produsen", "B. Konsumen tingkat satu", "C. Konsumen tingkat dua", "D. Pengurai (Dekomposer)"];
-        key = "a";
-        expl = "Tumbuhan hijau dikelompokkan sebagai Produsen karena mampu mendesain zat makanan sendiri melalui klorofil dan fotosintesis.";
+        const ipasMiscTemplates = [
+          {
+            stimFaseA: `Tumbuhan hijau mendapat tenaga langsung dari sinar matahari.`,
+            qtextFaseA: `Makhluk hidup yang membuat makanannya sendiri disebut...`,
+            optsFaseA: ["A. Produsen", "B. Konsumen", "C. Pengurai", "D. Pemangsa"],
+            keyFaseA: "a",
+            explFaseA: "Produsen membuat makanannya sendiri.",
+
+            stimFaseBC: `Dalam rantai makanan ekosistem sawah, padi merupakan tumbuhan hijau yang memproduksi zat makanan.`,
+            qtextFaseBC: "Disebut apakah kedudukan makhluk hidup yang mampu membuat zat makanannya sendiri?",
+            optsFaseBC: ["A. Produsen", "B. Konsumen tingkat I", "C. Konsumen tingkat II", "D. Pengurai"],
+            keyFaseBC: "a",
+            explFaseBC: "Tumbuhan memproduksi makanan sendiri sehingga disebut produsen."
+          },
+          {
+            stimFaseA: `Sepeda ditekan remnya sehingga rodanya berhenti meluncur.`,
+            qtextFaseA: `Gaya yang membuat roda sepeda berhenti meluncur adalah gaya...`,
+            optsFaseA: ["A. Gaya gesek", "B. Gaya magnet", "C. Gaya listrik", "D. Gaya gravitasi"],
+            keyFaseA: "a",
+            explFaseA: "Karet rem bergesekan dengan roda menimbulkan gaya gesek.",
+
+            stimFaseBC: `${nameA} mengendarai sepeda lalu menekan tuas rem hingga sepedanya berhenti.`,
+            qtextFaseBC: "Gaya apakah yang bekerja menahan laju roda sepeda ketika karet rem bergesekan dengan roda?",
+            optsFaseBC: ["A. Gaya gesek", "B. Gaya magnet", "C. Gaya gravitasi bumi", "D. Gaya pegas karet"],
+            keyFaseBC: "a",
+            explFaseBC: "Gaya gesek timbul dari dua permukaan benda yang saling bersentuhan menghambat gerak."
+          },
+          {
+            stimFaseA: `Buah kelapa jatuh dari pohon tinggi langsung ke tanah.`,
+            qtextFaseA: `Buah kelapa jatuh ke tanah karena tarikan gaya...`,
+            optsFaseA: ["A. Gaya gravitasi", "B. Gaya magnet", "C. Gaya gesek", "D. Gaya otot"],
+            keyFaseA: "a",
+            explFaseA: "Gravitasi bumi menarik semua benda ke bawah.",
+
+            stimFaseBC: `Buah mangga yang matang jatuh dari tangkai pohonnya langsung menuju ke permukaan tanah.`,
+            qtextFaseBC: "Gaya tarik dari bumi manakah yang menyebabkan buah mangga jatuh ke bawah?",
+            optsFaseBC: ["A. Gaya gravitasi bumi", "B. Gaya magnet bumi", "C. Gaya gesek udara", "D. Gaya pegas dahan"],
+            keyFaseBC: "a",
+            explFaseBC: "Gaya gravitasi menarik objek bermassa menuju pusat bumi."
+          },
+          {
+            stimFaseA: `Ular memakan tikus di sawah paman agar padi aman.`,
+            qtextFaseA: `Dalam rantai makanan di sawah, ular berperan sebagai...`,
+            optsFaseA: ["A. Konsumen", "B. Produsen", "C. Pengurai", "D. Tumbuhan"],
+            keyFaseA: "a",
+            explFaseA: "Ular memakan hewan lain (tikus), maka ular berkedudukan sebagai konsumen.",
+
+            stimFaseBC: `Tikus memakan padi di sawah, kemudian tikus dimangsa oleh ular sawah.`,
+            qtextFaseBC: "Berdasarkan rantai makanan tersebut, apakah kedudukan ular sawah?",
+            optsFaseBC: ["A. Konsumen tingkat II", "B. Produsen utama", "C. Konsumen tingkat I", "D. Pengurai (dekomposer)"],
+            keyFaseBC: "a",
+            explFaseBC: "Ular memakan tikus (konsumen I), sehingga ular bertindak sebagai konsumen tingkat II."
+          }
+        ];
+        const t = ipasMiscTemplates[num % ipasMiscTemplates.length];
+        if (currentPhase === "Fase A") {
+          stim = t.stimFaseA; qtext = t.qtextFaseA; opts = t.optsFaseA; key = t.keyFaseA; expl = t.explFaseA;
+        } else {
+          stim = t.stimFaseBC; qtext = t.qtextFaseBC; opts = t.optsFaseBC; key = t.keyFaseBC; expl = t.explFaseBC;
+        }
       }
     }
     else if (subject.includes("Agama")) {
-      stim = `Saat pelajaran Agama di ${sekolah}, siswa diajarkan untuk senantiasa membiasakan perilaku jujur, rendah hati, dan saling mengasihi sesama manusia.`;
-      
-      qtext = "Di bawah ini, manakah contoh sikap rendah hati dan terpuji yang patut dipraktikkan dalam berinteraksi dengan teman kelas?";
-      opts = [
-        "A. Memamerkan nilai raport yang bagus dengan nada meremehkan usaha teman",
-        "B. Mau bermain dengan semua teman tanpa membedakan latar belakang agama",
-        "C. Memotong perkataan teman ketika sedang menyampaikan gagasan",
-        "D. Menyimpan amarah ketika dinasihati oleh bapak dan ibu guru"
+      const agamaTemplates = [
+        {
+          stimFaseA: `Kita harus jujur kepada guru dan teman di sekolah.`,
+          qtextFaseA: `Manakah contoh sikap jujur dan terpuji di ruang kelas?`,
+          optsFaseA: ["A. Berkata yang benar kepada guru", "B. Berbohong kepada teman", "C. Menyembunyikan pensil teman", "D. Mencontek saat ulangan"],
+          keyFaseA: "a",
+          explFaseA: "Berkata benar adalah perilaku jujur.",
+
+          stimFaseBC: `Pendidikan agama mengajarkan para murid untuk selalu membiasakan sikap jujur dalam setiap ucapan dan perbuatan.`,
+          qtextFaseBC: "Manakah tindakan di sekolah yang mencerminkan sikap jujur dan amanah?",
+          optsFaseBC: [
+            "A. Mengakui kesalahan secara terbuka dan meminta maaf",
+            "B. Menyembunyikan buku tulis teman sekelas yang terjatuh",
+            "C. Menyalin jawaban ujian milik teman di sebelahnya",
+            "D. Menyalahkan orang lain agar terhindar dari hukuman kelas"
+          ],
+          keyFaseBC: "a",
+          explFaseBC: "Mengakui kesalahan dengan lapang dada adalah wujud konkret kejujuran."
+        },
+        {
+          stimFaseA: `Semua teman harus diajak bermain bersama dengan rukun.`,
+          qtextFaseA: `Sikap rukun dan terpuji dengan teman bermain adalah...`,
+          optsFaseA: ["A. Mau berteman dengan siapa saja", "B. Memilih teman yang kaya saja", "C. Marah saat kalah bermain", "D. Mengajak teman bertengkar"],
+          keyFaseA: "a",
+          explFaseA: "Sikap ramah dan mau bermain dengan siapa saja menjaga kerukunan.",
+
+          stimFaseBC: `Saat pelajaran Agama, siswa diajarkan membiasakan perilaku rendah hati dan saling mengasihi.`,
+          qtextFaseBC: "Di bawah ini, manakah contoh sikap rendah hati yang patut dipraktikkan?",
+          optsFaseBC: [
+            "A. Mau berteman dengan siapa saja tanpa membeda-bedakan",
+            "B. Memamerkan barang mewah baru dengan nada sombong",
+            "C. Memotong perkataan teman ketika sedang berdiskusi",
+            "D. Menyimpan amarah saat dinasihati bapak ibu guru"
+          ],
+          keyFaseBC: "a",
+          explFaseBC: "Rendah hati ditunjukkan dengan mau berteman tulus tanpa memandang perbedaan derajat."
+        },
+        {
+          stimFaseA: `Kita wajib membantu ibu dan ayah merapikan rumah.`,
+          qtextFaseA: `Cara menghormati orang tua di rumah yang benar adalah...`,
+          optsFaseA: ["A. Membantu pekerjaan rumah secara ikhlas", "B. Bermain game saat ibu memanggil", "C. Membangkang perintah ayah", "D. Berteriak meminta uang jajan"],
+          keyFaseA: "a",
+          explFaseA: "Membantu orang tua merupakan kewajiban luhur anak.",
+
+          stimFaseBC: `Menghormati orang tua dan mendengarkan nasihat baiknya merupakan ajaran mulia dalam semua agama.`,
+          qtextFaseBC: "Manakah tindakan seorang anak yang paling berbakti kepada orang tuanya?",
+          optsFaseBC: [
+            "A. Membantu meringankan pekerjaan rumah tangga dengan sukarela",
+            "B. Mengabaikan perintah orang tua saat asyik bermain gawai",
+            "C. Menuntut uang saku harian secara berlebihan",
+            "D. Berbicara dengan nada tinggi dan ketus kepada ibu"
+          ],
+          keyFaseBC: "a",
+          explFaseBC: "Meringankan beban orang tua dengan tulus adalah wujud konkret bakti anak."
+        },
+        {
+          stimFaseA: `Membantu teman yang jatuh di halaman adalah perbuatan baik.`,
+          qtextFaseA: `Sikap membantu teman yang jatuh merupakan contoh perilaku...`,
+          optsFaseA: ["A. Tolong-menolong", "B. Sombong", "C. Acuh tak acuh", "D. Pilih kasih"],
+          keyFaseA: "a",
+          explFaseA: "Menolong orang yang kesulitan adalah bentuk tolong-menolong.",
+
+          stimFaseBC: `Di ${sekolah}, ${nameA} melihat teman kelasnya terjatuh terpeleset di lapangan sekolah.`,
+          qtextFaseBC: "Apakah tindakan terbaik yang mencerminkan sikap tolong-menolong antarsiswa?",
+          optsFaseBC: [
+            "A. Segera membantu teman tersebut berdiri dan mengantarnya ke UKS",
+            "B. Menertawakan teman tersebut bersama dengan siswa lainnya",
+            "C. Mengabaikan kejadian itu dan terus berjalan ke kantin",
+            "D. Menyalahkan teman tersebut karena tidak berhati-hati melangkah"
+          ],
+          keyFaseBC: "a",
+          explFaseBC: "Segera menolong teman yang kesakitan menunjukkan kepedulian sosial yang diajarkan agama."
+        }
       ];
-      key = "b";
-      expl = "Sikap ramah dan mau berteman secara ikhlas dengan siapa saja tanpa diskriminasi adalah cerminan ajaran budi pekerti luhur di semua pengajaran agama.";
+      const t = agamaTemplates[num % agamaTemplates.length];
+      if (currentPhase === "Fase A") {
+        stim = t.stimFaseA; qtext = t.qtextFaseA; opts = t.optsFaseA; key = t.keyFaseA; expl = t.explFaseA;
+      } else {
+        stim = t.stimFaseBC; qtext = t.qtextFaseBC; opts = t.optsFaseBC; key = t.keyFaseBC; expl = t.explFaseBC;
+      }
     }
     else if (subject.toLowerCase().includes("pjok") || subject.toLowerCase().includes("jasmani") || subject.toLowerCase().includes("olahraga") || subject.toLowerCase().includes("penjas")) {
       // Dynamic physical education templates
