@@ -10,6 +10,7 @@ import {
   Sparkles,
   Trash2
 } from "lucide-react";
+import { generateImage } from "../imageUtils";
 
 interface QuestionWithImageProps {
   q: QuestionItem;
@@ -85,35 +86,55 @@ export default function QuestionWithImage({ q, subject, onUpdateQuestion, disabl
     setError(null);
 
     try {
-      const response = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-user-api-key": localStorage.getItem("ttu_user_api_key") || ""
-        },
-        body: JSON.stringify({
-          subject,
-          question: q,
-          prompt: customPrompt.trim() || undefined,
-          userApiKey: localStorage.getItem("ttu_user_api_key") || "",
-        })
-      });
+      let imageUrl = "";
+      try {
+        console.log("[QuestionWithImage] Trying backend /api/generate-image...");
+        const response = await fetch("/api/generate-image", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "x-user-api-key": localStorage.getItem("ttu_user_api_key") || ""
+          },
+          body: JSON.stringify({
+            subject,
+            question: q,
+            prompt: customPrompt.trim() || undefined,
+            userApiKey: localStorage.getItem("ttu_user_api_key") || "",
+          })
+        });
 
-      if (!response.ok) {
-        throw new Error(`Gagal memanggil API (${response.status})`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.imageUrl) {
+            imageUrl = data.imageUrl;
+          }
+        } else {
+          console.warn(`[QuestionWithImage] Backend returned status ${response.status}`);
+        }
+      } catch (backendErr) {
+        console.warn("[QuestionWithImage] Backend image generation failed/timed out, falling back to client-side:", backendErr);
       }
 
-      const data = await response.json();
-      if (data.imageUrl && onUpdateQuestion) {
+      // If backend failed (or timed out, which is common on Netlify functions), try direct client-side generation
+      if (!imageUrl) {
+        console.log("[QuestionWithImage] Executing client-side direct Google AI Studio generation...");
+        const promptToUse = customPrompt.trim() || q.imagenPrompt || q.imagePrompt || q.questionText || "";
+        const clientResult = await generateImage(promptToUse, subject, q);
+        if (clientResult) {
+          imageUrl = clientResult;
+        }
+      }
+
+      if (imageUrl && onUpdateQuestion) {
         onUpdateQuestion({
           ...q,
-          imageUrl: data.imageUrl,
+          imageUrl: imageUrl,
           svgContent: undefined,
           imagenPrompt: customPrompt.trim() || q.imagenPrompt
         });
         setShowPromptInput(false);
       } else {
-        throw new Error("Respons gambar tidak mengandung data URL yang valid.");
+        throw new Error("Gagal membangkitkan gambar AI baik lewat server maupun browser.");
       }
     } catch (err: any) {
       console.error(err);

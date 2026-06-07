@@ -272,113 +272,42 @@ Strict Avoidance (Negative Prompt): ${negativePromptStr}`;
       httpOptions: { headers: { "User-Agent": "aistudio-build-imagen" } }
     });
 
-    // Model 1: 'imagen-3.0-generate-002'
-    try {
-      const config: any = {
-        numberOfImages: 1,
-        outputMimeType: 'image/jpeg',
-        aspectRatio: '1:1',
-      };
-      if (allowNegativePrompt) {
-        config.negativePrompt = negativePromptStr;
-      }
+    const models = ["imagen-3.0-generate-002", "imagen-3.0-capability-001"];
+    let skipKey = false;
 
-      const response = await ai.models.generateImages({
-        model: 'imagen-3.0-generate-002',
-        prompt: enhancedPrompt,
-        config: config,
-      });
-      
-      if (response?.generatedImages?.[0]?.image?.imageBytes) {
-        console.log(`[Google Imagen] Successfully generated image via 'imagen-3.0-generate-002'!`);
-        return `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
-      }
-    } catch (err: any) {
-      console.warn(`[Google Imagen] 'imagen-3.0-generate-002' failed with key: ${activeKey.slice(0, 10)}... Error:`, err.message || err);
-      const errStr = String(err.message || "").toLowerCase();
-      if (errStr.includes("negativeprompt") || errStr.includes("negative_prompt")) {
-        allowNegativePrompt = false;
-      }
-      if (err.status === 429 || errStr.includes("quota") || errStr.includes("limit")) {
-        continue; // Try next key
-      }
-    }
-
-    // Model 2: 'gemini-2.5-flash-image'
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: enhancedPrompt }] },
-        config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
-      });
-      if (response?.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData?.data) {
-            console.log(`[Google Imagen] Successfully generated image using gemini-2.5-flash-image!`);
-            return `data:image/jpeg;base64,${part.inlineData.data}`;
-          }
+    for (const modelId of models) {
+      if (skipKey) break;
+      try {
+        const config: any = {
+          numberOfImages: 1,
+          outputMimeType: 'image/jpeg',
+          aspectRatio: '1:1',
+        };
+        if (allowNegativePrompt) {
+          config.negativePrompt = negativePromptStr;
         }
-      }
-    } catch (err: any) {
-      console.warn(`[Google Imagen] 'gemini-2.5-flash-image' failed with key: ${activeKey.slice(0, 10)}... Error:`, err.message || err);
-      const errStr = String(err.message || "").toLowerCase();
-      if (err.status === 429 || errStr.includes("quota") || errStr.includes("limit")) {
-        continue; // Try next key
-      }
-    }
 
-    // Model 3: 'gemini-3.1-flash-image-preview'
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-image-preview',
-        contents: { parts: [{ text: enhancedPrompt }] },
-        config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
-      });
-      if (response?.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData?.data) {
-            console.log(`[Google Imagen] Successfully generated image using gemini-3.1-flash-image-preview!`);
-            return `data:image/jpeg;base64,${part.inlineData.data}`;
-          }
+        const response = await ai.models.generateImages({
+          model: modelId,
+          prompt: enhancedPrompt,
+          config: config,
+        });
+        
+        if (response?.generatedImages?.[0]?.image?.imageBytes) {
+          console.log(`[Google Imagen] Successfully generated image via '${modelId}'!`);
+          return `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
         }
-      }
-    } catch (err: any) {
-      console.warn(`[Google Imagen] 'gemini-3.1-flash-image-preview' failed with key: ${activeKey.slice(0, 10)}... Error:`, err.message || err);
-      const errStr = String(err.message || "").toLowerCase();
-      if (err.status === 429 || errStr.includes("quota") || errStr.includes("limit")) {
-        continue;
-      }
-    }
-
-    // Model 4: 'imagen-3.0-capability-001'
-    try {
-      const config: any = {
-        numberOfImages: 1,
-        outputMimeType: 'image/jpeg',
-        aspectRatio: '1:1',
-      };
-      if (allowNegativePrompt) {
-        config.negativePrompt = negativePromptStr;
-      }
-
-      const response = await ai.models.generateImages({
-        model: 'imagen-3.0-capability-001',
-        prompt: enhancedPrompt,
-        config: config,
-      });
-      
-      if (response?.generatedImages?.[0]?.image?.imageBytes) {
-        console.log(`[Google Imagen] Successfully generated image via 'imagen-3.0-capability-001'!`);
-        return `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
-      }
-    } catch (err: any) {
-      console.warn(`[Google Imagen] 'imagen-3.0-capability-001' failed with key: ${activeKey.slice(0, 10)}... Error:`, err.message || err);
-      const errStr = String(err.message || "").toLowerCase();
-      if (errStr.includes("negativeprompt") || errStr.includes("negative_prompt")) {
-        allowNegativePrompt = false;
-      }
-      if (err.status === 429 || errStr.includes("quota") || errStr.includes("limit")) {
-        continue;
+      } catch (err: any) {
+        console.warn(`[Google Imagen] '${modelId}' failed with key: ${activeKey.slice(0, 10)}... Error:`, err.message || err);
+        const errStr = String(err.message || "").toLowerCase();
+        if (errStr.includes("negativeprompt") || errStr.includes("negative_prompt")) {
+          allowNegativePrompt = false;
+        }
+        if (err.status === 400 || err.status === 401 || err.status === 403 || err.status === 429 || 
+            errStr.includes("key") || errStr.includes("api key") || errStr.includes("quota") || errStr.includes("limit") || errStr.includes("not found")) {
+          console.warn(`[Google Imagen] Fatal error for key ${activeKey.slice(0, 10)}... skipping this key.`);
+          skipKey = true;
+        }
       }
     }
   }
@@ -454,20 +383,20 @@ function getRelevantVerifiedUnsplashUrl(subject: string, questionText: string, m
     return VERIFIED_UNSPLASH_IMAGE_POOL.schoolInteraction;
   }
 
-  // 1. SPECIFIC ANIMALS & PETS (Differentiated cleanly)
-  if (textToScan.includes("kucing") || textToScan.includes("cat")) {
+  // 1. SPECIFIC ANIMALS & PETS (Differentiated cleanly using regex word boundaries to prevent false positives)
+  if (/\bkucing\b/i.test(textToScan) || /\bcat(s)?\b/i.test(textToScan)) {
     return VERIFIED_UNSPLASH_IMAGE_POOL.cat;
   }
-  if (textToScan.includes("anjing") || textToScan.includes("dog")) {
+  if (/\banjing\b/i.test(textToScan) || /\bdog(s)?\b/i.test(textToScan)) {
     return VERIFIED_UNSPLASH_IMAGE_POOL.dog;
   }
-  if (textToScan.includes("burung") || textToScan.includes("bird")) {
+  if (/\bburung\b/i.test(textToScan) || /\bbird(s)?\b/i.test(textToScan)) {
     return VERIFIED_UNSPLASH_IMAGE_POOL.bird;
   }
-  if (textToScan.includes("ikan") || textToScan.includes("fish")) {
+  if (/\bikan\b/i.test(textToScan) || /\bfish(es)?\b/i.test(textToScan)) {
     return VERIFIED_UNSPLASH_IMAGE_POOL.fish;
   }
-  if (textToScan.includes("kelinci") || textToScan.includes("rabbit")) {
+  if (/\bkelinci\b/i.test(textToScan) || /\brabbit(s)?\b/i.test(textToScan)) {
     return VERIFIED_UNSPLASH_IMAGE_POOL.rabbit;
   }
   if (
@@ -1039,6 +968,14 @@ PASTIKAN:
   }
 
   rules += `
+    ========================================================================
+    ATURAN ANTI-DUPLIKAT & KEUNIKAN SOAL (MANDATORI & SANGAT KETAT):
+    - Hasil generate soal WAJIB menghasilkan soal yang BERBEDA di setiap nomor. DILARANG KERAS ada soal yang memiliki kesamaan/kemiripan cerita, situasi, subjek, objek, atau angka!
+    - Gunakan objek (benda, barang, buah, hewan, dll), subjek (nama tokoh murid/guru/orang/hewan), latar (tempat, waktu, suasana), dan angka yang BERBEDA-BEDA untuk setiap nomor soal. Semua harus bervariasi secara unik!
+    - Pastikan semua soal tetap merujuk secara akurat pada capaian pembelajaran, topik, materi, indikator yang dipilih, serta tingkat kelas.
+    - Situasi pada setiap soal HARUS bervariasi secara kreatif, misalnya berlatar di: sekolah, ruang kelas, lapangan olahraga, kantin, taman bermain, perpustakaan, pasar tradisional, lingkungan rumah, sawah, kebun, pantai, daerah pegunungan, jalan raya, koperasi, atau tempat relevan lainnya yang sesuai dengan materi pelajaran!
+    - KHUSUS bagi murid Kelas 1, Kelas 2, dan Kelas 3: Gunakan bahasa yang SANGAT sederhana, singkat, lugas, ramah anak, langsung pada intinya, dan TIDAK bertele-tele (hindari kalimat pembuka atau pengantar cerita yang terlalu panjang, usahakan stimulus/pertanyaan ringkas).
+    
     - Pastikan semua naskah stimulus, pertanyaan, serta pilihan jawaban beralur logis, sederhana, ramah anak, dan bebas dari kata asing Inggris.
     ========================================================================
   `;
@@ -1700,6 +1637,15 @@ app.post("/api/generate-kisi-kisi", async (req, res) => {
       - ⚠️ WAJIB IKUTI KONFIGURASI JENIS SOAL: Jumlah dan jenis soal HARUS PERSIS sesuai "Konfigurasi Jumlah dan Jenis Soal" di atas. Jika ada 'Pilihan Ganda Kompleks', WAJIB gunakan bentuk soal 'Pilihan Ganda Kompleks'. Jika ada 'Menjodohkan', WAJIB gunakan 'Menjodohkan'. JANGAN ubah jenis soal menjadi 'Pilihan Ganda' biasa!
       - ⚠️ ACAK KUNCI JAWABAN PG: Untuk soal Pilihan Ganda, kunci jawaban (A/B/C/D) WAJIB diacak total dan benar-benar tidak berpola. DILARANG KERAS pola A,B,C,D,A,B,C,D berulang!
 
+      ==================================================================
+      ATURAN ANTI-DUPLIKAT & KEUNIKAN SOAL (MANDATORI & SANGAT KETAT):
+      ==================================================================
+      - Hasil generate soal WAJIB menghasilkan soal yang BERBEDA di setiap nomor. DILARANG KERAS ada soal yang memiliki kesamaan/kemiripan cerita, situasi, subjek, objek, atau angka!
+      - Gunakan objek (benda, barang, buah, hewan, dll), subjek (nama tokoh murid/guru/orang/hewan), latar (tempat, waktu, suasana), dan angka yang BERBEDA-BEDA untuk setiap nomor soal. Semua harus bervariasi secara unik!
+      - Pastikan semua soal tetap merujuk secara akurat pada capaian pembelajaran, topik, materi, indikator yang dipilih, serta tingkat kelas.
+      - Situasi pada setiap soal HARUS bervariasi secara kreatif, misalnya berlatar di: sekolah, ruang kelas, lapangan olahraga, kantin, taman bermain, perpustakaan, pasar tradisional, lingkungan rumah, sawah, kebun, pantai, daerah pegunungan, jalan raya, koperasi, atau tempat relevan lainnya yang sesuai dengan materi pelajaran!
+      - KHUSUS bagi murid Kelas 1, Kelas 2, dan Kelas 3: Gunakan bahasa yang SANGAT sederhana, singkat, lugas, ramah anak, langsung pada intinya, dan TIDAK bertele-tele (hindari kalimat pembuka atau pengantar cerita yang terlalu panjang, usahakan stimulus/pertanyaan ringkas).
+
       Hasilkan keluaran JSON murni sesuai skema pendukung.
     `;
 
@@ -1977,6 +1923,15 @@ app.post("/api/generate-soal", async (req, res) => {
         * Pertanyaan yang muncul di bagian "questionText" hanya langsung menanyakan inti permasalahan, TANPA titik-titik (.....) karena guru akan menyediakan kertas lembar jawaban terpisah secara manual.
       - PASTIKAN SANGAT BERVARIASI (ENTROPI TINGGI) untuk setiap hasil generate. Jauhi template monoton!
       
+      ==================================================================
+      ATURAN ANTI-DUPLIKAT & KEUNIKAN SOAL (MANDATORI & SANGAT KETAT):
+      ==================================================================
+      - Hasil generate soal WAJIB menghasilkan soal yang BERBEDA di setiap nomor. DILARANG KERAS ada soal yang memiliki kesamaan/kemiripan cerita, situasi, subjek, objek, atau angka!
+      - Gunakan objek (benda, barang, buah, hewan, dll), subjek (nama tokoh murid/guru/orang/hewan), latar (tempat, waktu, suasana), dan angka yang BERBEDA-BEDA untuk setiap nomor soal. Semua harus bervariasi secara unik!
+      - Pastikan semua soal tetap merujuk secara akurat pada capaian pembelajaran, topik, materi, indikator yang dipilih, serta tingkat kelas.
+      - Situasi pada setiap soal HARUS bervariasi secara kreatif, misalnya berlatar di: sekolah, ruang kelas, lapangan olahraga, kantin, taman bermain, perpustakaan, pasar tradisional, lingkungan rumah, sawah, kebun, pantai, daerah pegunungan, jalan raya, koperasi, atau tempat relevan lainnya yang sesuai dengan materi pelajaran!
+      - KHUSUS bagi murid Kelas 1, Kelas 2, dan Kelas 3: Gunakan bahasa yang SANGAT sederhana, singkat, lugas, ramah anak, langsung pada intinya, dan TIDAK bertele-tele (hindari kalimat pembuka atau pengantar cerita yang terlalu panjang, usahakan stimulus/pertanyaan ringkas).
+
       Hasilkan keluaran JSON murni terstruktur.
     `;
 

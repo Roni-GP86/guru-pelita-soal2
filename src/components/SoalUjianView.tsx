@@ -1451,7 +1451,7 @@ INSTRUKSI DESAIN SVG:
     setImageError(null);
     try {
       const updatedQ = await generateImageForSoal(subject, editingQuestion);
-      if (updatedQ.imageUrl && updatedQ.imageUrl.startsWith("data:")) {
+      if (updatedQ.imageUrl) {
         setEditingQuestion(updatedQ);
       } else {
         throw new Error("Gagal menghasilkan gambar dari API. Silakan periksa koneksi dan validitas API Key Anda.");
@@ -1555,7 +1555,7 @@ INSTRUKSI DESAIN SVG:
             <p className="text-xs text-slate-450 mt-1 font-semibold leading-relaxed">
               Anda kini dapat <b>mengedit butir soal secara visual</b> dengan mengeklik langsung pada soal sebelum mengunduh.
             </p>
-            {questions.some(q => q.imageUrl || q.svgContent) && (
+            {hitungSoalBergambar(questions.length) > 0 && (
               <p className="text-[11px] text-amber-305 font-bold mt-1.5 flex items-center gap-1">
                 <span>🎨</span> Ilustrasi Gambar Terlakon: <strong className="text-white bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md font-black">{questions.filter(q => q.imageUrl || q.svgContent).length} dari {hitungSoalBergambar(questions.length)} soal (Sasaran 25%)</strong>
               </p>
@@ -1564,7 +1564,7 @@ INSTRUKSI DESAIN SVG:
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end relative z-10">
-          {questions.some(q => q.imageUrl || q.svgContent) && (
+          {hitungSoalBergambar(questions.length) > 0 && (
             <button
               id="btn-batch-generate-images"
               type="button"
